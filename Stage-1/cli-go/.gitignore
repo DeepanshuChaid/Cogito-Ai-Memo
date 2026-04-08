@@ -1,0 +1,7 @@
+# Binaries
+*.exe
+cogito
+bin/
+
+# OS junk
+.DS_Store
