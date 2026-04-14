@@ -2,7 +2,7 @@ package types
 
 type HookEvent string
 
-// HOOKEVENT REPREST THE TYPE OF HOOK BEING TRGIGERED
+// HOOKEVENT REPRESENTS THE TYPE OF HOOK BEING TRGIGERED
 // FOR THOSE WHO DONT KNOW HOOKS ARE BASICALLY LIKE EVENTS HANDLERS BUT FOR CLI BASED AI'S
 const (
 	EventSessionStart HookEvent = "session_start"
@@ -30,7 +30,7 @@ type HookInput struct {
 	SessionID    string                 `json:"session_id"`
 	CWD          string                 `json:"cwd"`
 	Prompt       string                 `json:"prompt,omitempty"` // OMIT EMPTY MEANS IF ITS VALUE IS GIVEN THE KEY STAYS IF NOT GETS CUCKED
-	TooLName     string                 `json:"tool_name,omitempty"`
+	ToolName     string                 `json:"tool_name,omitempty"`
 	ToolInput    map[string]interface{} `json:"tool_input,omitempty"`
 	ToolResponse map[string]interface{} `json:"tool_response,omitempty"`
 

@@ -1,1 +1,1 @@
-package gemini
+package adapters
