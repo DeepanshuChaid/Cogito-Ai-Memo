@@ -4,171 +4,74 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
+	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/db"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/injector"
 )
 
-type CodexHookInput struct {
-	SessionID string `json:"session_id"`
-	CWD       string `json:"cwd"`
-	Prompt    string `json:"prompt,omitempty"`
-}
-
-type CodexHookOutput struct {
-	Continue           bool                     `json:"continue"`
-	SuppressOutput     bool                     `json:"suppressOutput,omitempty"`
-	HookSpecificOutput *CodexHookSpecificOutput `json:"hookSpecificOutput,omitempty"`
-	SystemMessage      string                   `json:"systemMessage,omitempty"`
-}
-
-type CodexHookSpecificOutput struct {
-	HookEventName     string `json:"hookEventName"`
-	AdditionalContext string `json:"additionalContext,omitempty"`
-}
-
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "install" {
-		runInstall()
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "install":
+			runInstall()
+			return
+		case "compress":
+			fmt.Println("Janitor is coming soon... (Step 3)")
+			return
+		}
+	}
+
+	// This part handles the Codex Hook (JSON input/output)
+	handleHook()
+}
+
+func handleHook() {
+	// Codex sends JSON to Stdin
+	var input struct {
+		CWD string `json:"cwd"`
+	}
+	if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
 		return
 	}
 
-	input := CodexHookInput{}
-	decoder := json.NewDecoder(os.Stdin)
-	if err := decoder.Decode(&input); err != nil {
-		input.CWD, _ = os.Getwd()
-		input.SessionID = "unknown"
-	}
-	if strings.TrimSpace(input.CWD) == "" {
-		input.CWD, _ = os.Getwd()
-	}
-	if strings.TrimSpace(input.SessionID) == "" {
-		input.SessionID = "unknown"
+	// 1. Get all compressed memories from SQLite
+	memoriesRaw, _ := db.GetAllMemories()
+	var memTexts []string
+	for _, m := range memoriesRaw {
+		memTexts = append(memTexts, fmt.Sprintf("%s: %s", m.FilePath, m.CompressedText))
 	}
 
-	context := injector.GenerateContext(input.CWD, input.SessionID)
+	// 2. We don't have a user query yet during SessionStart,
+	// so we just inject the rules and the project knowledge as a system message.
+	context := injector.BuildFinalPrompt("Start session", memTexts)
 
-	output := CodexHookOutput{
-		Continue:       true,
-		SuppressOutput: true,
-		HookSpecificOutput: &CodexHookSpecificOutput{
-			HookEventName:     "SessionStart",
-			AdditionalContext: context,
-		},
-		SystemMessage: context,
+	output := map[string]interface{}{
+		"continue": true,
+		"systemMessage": context,
 	}
 
-	jsonOut, err := json.Marshal(output)
-	if err != nil {
-		fmt.Println(`{"continue":true,"suppressOutput":true}`)
-		return
-	}
+	jsonOut, _ := json.Marshal(output)
 	fmt.Println(string(jsonOut))
 }
 
 func runInstall() {
 	fmt.Println("Installing Cogito...")
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Printf("Failed to resolve home directory: %v\n", err)
-		os.Exit(1)
-	}
-	configDir := filepath.Join(homeDir, ".cogito")
-
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		fmt.Printf("Failed to create config dir: %v\n", err)
-		os.Exit(1)
-	}
-
-	contextFile := filepath.Join(configDir, "context.md")
-	if _, err := os.Stat(contextFile); os.IsNotExist(err) {
-		defaultContext := `# Cogito Context
-
-## Instructions
-- Be terse and direct
-- Drop filler words (just, really, basically, sure, happy to help)
-- Drop articles (a, an, the) when possible
-- Fragments OK
-- Technical accuracy > politeness
-
-## Pattern
-[thing] [action] [reason]. [next step].
-
-## Examples
-Bad: "Sure! I'd be happy to help you with that. The issue is..."
-Good: "Bug in auth middleware. Token expiry check use < not <=. Fix:"
-
-## Exceptions
-- Code blocks: unchanged
-- Security explanations: normal English
-- User says "normal mode": deactivate
-`
-		if err := os.WriteFile(contextFile, []byte(defaultContext), 0644); err != nil {
-			fmt.Printf("Failed to create context file: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Println("Created config: ~/.cogito/context.md")
-	} else {
-		fmt.Println("Config already exists: ~/.cogito/context.md")
-	}
-
+	execPath, _ := os.Executable()
 	cwd, _ := os.Getwd()
 	hooksDir := filepath.Join(cwd, ".codex")
+	os.MkdirAll(hooksDir, 0755)
 
-	if err := os.MkdirAll(hooksDir, 0755); err != nil {
-		fmt.Printf("Failed to create .codex dir: %v\n", err)
-		os.Exit(1)
-	}
-
-	hooksFile := filepath.Join(hooksDir, "hooks.json")
 	hooksConfig := map[string]interface{}{
 		"hooks": map[string]interface{}{
 			"SessionStart": []map[string]string{
-				{
-					"type":    "command",
-					"command": resolveHookCommand(),
-				},
+				{"type": "command", "command": execPath},
 			},
 		},
 	}
-	hooksContent, err := json.MarshalIndent(hooksConfig, "", "  ")
-	if err != nil {
-		fmt.Printf("Failed to build hooks.json: %v\n", err)
-		os.Exit(1)
-	}
-	if err := os.WriteFile(hooksFile, hooksContent, 0644); err != nil {
-		fmt.Printf("Failed to create hooks.json: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("Created hook: %s/.codex/hooks.json\n", cwd)
 
-	fmt.Println("\nCogito installed successfully.")
-	fmt.Println("\nNext steps:")
-	fmt.Println("   1. Run 'codex' in this folder")
-	fmt.Println("   2. Ask a question to see caveman-style responses")
-	fmt.Println("   3. Edit ~/.cogito/context.md to customize instructions")
-}
-
-func resolveHookCommand() string {
-	if _, err := exec.LookPath("cogito"); err == nil {
-		return "cogito"
-	}
-
-	execPath, err := os.Executable()
-	if err != nil {
-		return "cogito"
-	}
-
-	execPath = filepath.Clean(execPath)
-	tempDir := strings.ToLower(filepath.Clean(os.TempDir()))
-	if strings.HasPrefix(strings.ToLower(execPath), tempDir) {
-		return "cogito"
-	}
-	if strings.Contains(execPath, " ") {
-		return fmt.Sprintf("\"%s\"", execPath)
-	}
-	return execPath
+	content, _ := json.MarshalIndent(hooksConfig, "", "  ")
+	os.WriteFile(filepath.Join(hooksDir, "hooks.json"), content, 0644)
+	fmt.Printf("Installed hook at %s\n", execPath)
 }

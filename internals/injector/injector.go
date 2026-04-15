@@ -2,53 +2,28 @@ package injector
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
-func GenerateContext(cwd, sessionID string) string {
-	// Try to load custom context file
-	contextFile := strings.TrimSpace(os.Getenv("COGITO_CONTEXT_FILE"))
-	if contextFile == "" {
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
-			contextFile = filepath.Join(homeDir, ".cogito", "context.md")
-		}
+const CavemanRules = `[SYSTEM RULES:
+Use Caveman Style.
+Pattern: [thing] [action] [reason].
+Drop articles (a, an, the).
+Drop fillers, pleasantries.
+Be terse. Technical fragments only.]`
+
+func BuildFinalPrompt(userQuery string, memories []string) string {
+	// Combine rules + any compressed project data + user question
+	var sb strings.Builder
+	sb.WriteString(CavemanRules)
+	sb.WriteString("\n\nPROJECT KNOWLEDGE:\n")
+
+	for _, mem := range memories {
+		sb.WriteString("- " + mem + "\n")
+		fmt.Println("INJECTOR FUNCTIONS RUNNING")
 	}
 
-	if contextFile != "" {
-		if content, err := os.ReadFile(contextFile); err == nil {
-			return string(content)
-		}
-	}
-
-	if strings.TrimSpace(cwd) == "" {
-		if wd, err := os.Getwd(); err == nil {
-			cwd = wd
-		}
-	}
-	if strings.TrimSpace(sessionID) == "" {
-		sessionID = "unknown"
-	}
-
-	// Default context
-	return fmt.Sprintf(`# Cogito Context
-
-## Session
-- ID: %s
-- Directory: %s
-
-## Instructions
-- Be terse and direct
-- Drop filler words
-- Technical accuracy > politeness
-- Code blocks unchanged
-
-## Memory
-Memory features coming soon.
-
-## Project Map
-Graphify integration coming soon.
-`, sessionID, cwd)
+	sb.WriteString("\nUSER QUERY: " + userQuery)
+	fmt.Println("INJECTOR COMPLETED")
+	return sb.String()
 }
