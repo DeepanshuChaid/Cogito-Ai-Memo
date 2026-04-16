@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/config"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/db"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/injector"
 )
@@ -16,46 +17,82 @@ func main() {
 		case "install":
 			runInstall()
 			return
+		case "config":
+			handleConfig() // Now we handle the config command
+			return
 		case "compress":
 			fmt.Println("Janitor is coming soon... (Step 3)")
 			return
 		}
 	}
 
-	fmt.Println("ITS WORKING")
+	// REMOVED: fmt.Println("ITS WORKING") <- This would break the hook!
 
-	// This part handles the Codex Hook (JSON input/output)
 	handleHook()
 }
 
+func handleConfig() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: cogito config <enabled|intensity> <value>")
+		return
+	}
+
+	cfg, _ := config.Load() // Loads current or creates defaults
+	key := os.Args[2]
+	val := os.Args[3]
+
+	switch key {
+	case "enabled":
+		cfg.Enabled = (val == "on" || val == "true")
+	case "intensity":
+		cfg.Intensity = val
+	default:
+		fmt.Println("Unknown setting. Use 'enabled' or 'intensity'")
+		return
+	}
+
+	config.Save(cfg)
+	fmt.Printf("✅ Updated %s to %s\n", key, val)
+}
+
 func handleHook() {
-	// Codex sends JSON to Stdin
 	var input struct {
 		CWD string `json:"cwd"`
 	}
 	if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
-		return // Return silently to avoid polluting stdout
+		return
 	}
 
-	// 1. Get all compressed memories from SQLite
+	// 1. LOAD CONFIG
+	// config.Load() automatically handles: "If file doesn't exist, return defaults"
+	cfg, err := config.Load()
+	if err != nil {
+		return
+	}
+
+	// If user disabled Cogito in config, exit silently so Codex runs normally
+	if !cfg.Enabled {
+		return
+	}
+
+	// 2. Get all compressed memories from SQLite
 	memoriesRaw, _ := db.GetAllMemories()
 	var memTexts []string
 	for _, m := range memoriesRaw {
 		memTexts = append(memTexts, fmt.Sprintf("%s: %s", m.FilePath, m.CompressedText))
 	}
 
-	// 2. We don't have a user query yet during SessionStart,
-	// so we just inject the rules and the project knowledge as a system message.
-	context := injector.BuildFinalPrompt("Start session", memTexts)
+	// 3. INJECT (Passing the config object as the 3rd argument)
+	context := injector.BuildFinalPrompt("Start session", memTexts, cfg)
 
 	output := map[string]interface{}{
 		"continue":      true,
-		"suppressOutput": true, // Added this to tell Codex not to print the system message to the user
+		"suppressOutput": true,
 		"systemMessage":  context,
 	}
 
 	jsonOut, _ := json.Marshal(output)
-	fmt.Println(string(jsonOut)) // THE ONLY PRINT ALLOWED
+	fmt.Println(string(jsonOut))
 }
 
 func runInstall() {
@@ -63,6 +100,16 @@ func runInstall() {
 
 	execPath, _ := os.Executable()
 	cwd, _ := os.Getwd()
+
+	// 1. Create .cogito folder for configs (Use MkdirAll to prevent error if it exists)
+	cogitoDir := filepath.Join(os.Getenv("USERPROFILE"), ".cogito") // Use User Profile for Windows
+	os.MkdirAll(cogitoDir, 0755)
+
+	// 2. Initialize default config file immediately upon installation
+	defaultCfg := &config.Config{Enabled: true, Intensity: "full"}
+	config.Save(defaultCfg)
+
+	// 3. Install Codex Hooks
 	hooksDir := filepath.Join(cwd, ".codex")
 	os.MkdirAll(hooksDir, 0755)
 
@@ -76,5 +123,5 @@ func runInstall() {
 
 	content, _ := json.MarshalIndent(hooksConfig, "", "  ")
 	os.WriteFile(filepath.Join(hooksDir, "hooks.json"), content, 0644)
-	fmt.Printf("Installed hook at %s\n", execPath)
+	fmt.Printf("✅ Installed hook at %s\n", execPath)
 }
