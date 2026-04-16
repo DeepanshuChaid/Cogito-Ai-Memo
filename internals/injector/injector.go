@@ -6,8 +6,8 @@ import (
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/config"
 )
 
-var IntensityPrompts = map[string]string{
-	"lite": `[MODE: LITE]
+var IntensityPrompts = map[config.Intensity]string{
+	config.IntensityLite: `[MODE: LITE]
 Goal: Professional brevity.
 Rules:
 - Drop filler words (just, really, basically, essentially).
@@ -15,31 +15,24 @@ Rules:
 - Keep basic grammar and sentence structure.
 - Technical accuracy > politeness.`,
 
-	"full": `[MODE: FULL CAVEMAN]
+	config.IntensityNormal: `[MODE: FULL CAVEMAN]
 Goal: Maximum density.
 Rules:
 - Pattern: [thing] [action] [reason]. [next step].
 - Drop ALL articles (a, an, the).
 - Drop fillers, pleasantries, and hedging ("it might be", "possibly").
 - Use fragments. No full sentences.
-- Short synonyms only (e.g., "fix" instead of "implement a solution for").
+- Short synonyms only.
 - PRESERVE EXACTLY: Code blocks, inline backticks, URLs, file paths, and commands.`,
 
-	"ultra": `[MODE: ULTRA]
+	config.IntensityUltra: `[MODE: ULTRA]
 Goal: Telegraphic compression.
 Rules:
 - Extreme brevity. Abbreviate everything.
-- Use symbols for logic: (→ for leads to, ↑ for increase, ↓ for decrease, = for equals).
+- Use symbols for logic: (→ for leads to, ↑ for increase, ↓ for decrease).
 - Remove all non-essential words.
 - Only technical substance.
 - PRESERVE EXACTLY: Code blocks, inline backticks, URLs, and file paths.`,
-
-	"wenyan": `[MODE: WENYAN]
-Goal: Classical Chinese compression.
-Rules:
-- Use Classical Chinese (文言文) for natural language.
-- Keep all technical terms, code, and English identifiers in original English.
-- Maximum token efficiency.`,
 }
 
 func BuildFinalPrompt(userQuery string, memories []string, cfg *config.Config) string {
@@ -49,18 +42,15 @@ func BuildFinalPrompt(userQuery string, memories []string, cfg *config.Config) s
 
 	var sb strings.Builder
 
-	// 1. Selection of the "Mouth" (Intensity)
 	prompt, ok := IntensityPrompts[cfg.Intensity]
 	if !ok {
-		prompt = IntensityPrompts["full"]
+		prompt = IntensityPrompts[config.IntensityNormal]
 	}
 
-	// 2. The System Instructions
 	sb.WriteString("### SYSTEM DIRECTIVE\n")
 	sb.WriteString(prompt)
 	sb.WriteString("\n\nCRITICAL: Do not revert to polite mode. No filler drift. Code blocks must remain UNCHANGED.\n")
 
-	// 3. The "Brain" (Project Knowledge)
 	if len(memories) > 0 {
 		sb.WriteString("\n\n### PROJECT KNOWLEDGE\n")
 		for _, mem := range memories {
@@ -68,7 +58,6 @@ func BuildFinalPrompt(userQuery string, memories []string, cfg *config.Config) s
 		}
 	}
 
-	// 4. The Target (User Query)
 	sb.WriteString("\n\n### USER QUERY\n")
 	sb.WriteString(userQuery)
 

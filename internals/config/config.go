@@ -6,17 +6,27 @@ import (
 	"path/filepath"
 )
 
+type Intensity string
+
+const (
+	IntensityLite   Intensity = "lite"
+	IntensityNormal Intensity = "normal"
+	IntensityUltra  Intensity = "ultra"
+)
+
+
 type Config struct {
 	Enabled   bool   `json:"enabled"`
-	Intensity string `json:"intensity"`
+	Intensity Intensity `json:"intensity"`
 }
 
 func GetConfigPath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".cogito", "config.json")
+	cwd, _ := os.Getwd()
+	return filepath.Join(cwd, ".cogito", "config.json")
 }
 
-func MustLoad() (*Config, error) {
+
+func Load() (*Config, error) {
 	path := GetConfigPath()
 
 	// TRY TO READ THE FILE IF WE ARE NOT ABLE TO WE RETURN THE DEFAULT CONFIG
@@ -35,13 +45,24 @@ func MustLoad() (*Config, error) {
 	return &cfg, nil
 }
 
-
 func Save(cfg *Config) error {
-	path := GetConfigPath()
+	// Save to current directory instead of home
+	cwd, _ := os.Getwd()
+	path := filepath.Join(cwd, ".cogito", "config.json")
+
 	os.MkdirAll(filepath.Dir(path), 0755)
-	data, err := json.MarshalIndent(cfg, "", "")
+	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(path, data, 0644)
+}
+
+
+
+func IsValid(Intensity Intensity) bool {
+	if Intensity != IntensityLite && Intensity != IntensityNormal && Intensity != IntensityUltra {
+		return false
+	}
+	return true
 }
