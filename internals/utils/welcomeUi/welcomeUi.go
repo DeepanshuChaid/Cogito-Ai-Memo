@@ -8,7 +8,7 @@ import (
 )
 
 func ShowWelcomeUI() {
-	// Load config safely
+	// Load config
 	cfg, _ := config.Load()
 
 	mode := "Not configured"
@@ -21,16 +21,13 @@ func ShowWelcomeUI() {
 		}
 	}
 
-	// Colors
-	var (
-		accent   = lipgloss.Color("63")
-		muted    = lipgloss.Color("240")
-		highlight = lipgloss.Color("205")
-		success  = lipgloss.Color("42")
-		warn     = lipgloss.Color("214")
-	)
+	// 🎨 Exact color palette
+	mint := lipgloss.Color("#9FDBA1") // ✅ your exact color
+	text := lipgloss.Color("#EDEDED")
+	muted := lipgloss.Color("#eee") // subtle gray
+	success := lipgloss.Color("#22C55E")
 
-	// Banner
+	// ===== Banner =====
 	banner := `
    ██████╗  ██████╗  ██████╗ ██╗████████╗ ██████╗
   ██╔════╝ ██╔═══██╗██╔════╝ ██║╚══██╔══╝██╔═══██╗
@@ -41,27 +38,28 @@ func ShowWelcomeUI() {
 	`
 
 	styledBanner := lipgloss.NewStyle().
-		Foreground(highlight).
+		Foreground(mint).
 		Bold(true).
 		Render(banner)
 
+	// Subtitle
 	subtitle := lipgloss.NewStyle().
 		Foreground(muted).
 		Render("Token Optimizer for AI CLI")
 
-	// Status line
-	statusColor := warn
+	// Status
+	statusColor := muted
 	if status == "Active" {
 		statusColor = success
 	}
 
 	statusLine := lipgloss.NewStyle().
 		Foreground(statusColor).
-		Render(fmt.Sprintf("● %s", status))
+		Render("● " + status)
 
 	modeLine := lipgloss.NewStyle().
-		Foreground(accent).
-		Render(fmt.Sprintf("Mode: %s", mode))
+		Foreground(text).
+		Render("Mode: " + mode)
 
 	info := lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -70,29 +68,41 @@ func ShowWelcomeUI() {
 	)
 
 	// Commands
-	cmdStyle := lipgloss.NewStyle().Foreground(accent)
+	arrow := lipgloss.NewStyle().
+		Foreground(mint).
+		Render("▸")
+
+	cmd := func(label, desc string) string {
+		return fmt.Sprintf(
+			"%s %-18s %s",
+			arrow,
+			label,
+			lipgloss.NewStyle().Foreground(muted).Render(desc),
+		)
+	}
 
 	commands := lipgloss.JoinVertical(
 		lipgloss.Left,
-		cmdStyle.Render("▸ cogito install   setup hooks"),
-		cmdStyle.Render("▸ cogito config    configure modes"),
-		cmdStyle.Render("▸ cogito uninstall remove hooks"),
-		cmdStyle.Render("▸ cogito --help    show help"),
+		cmd("cogito install", "setup hooks"),
+		cmd("cogito config", "configure modes"),
+		cmd("cogito uninstall", "remove hooks"),
+		cmd("cogito --help", "show help"),
 	)
 
 	divider := lipgloss.NewStyle().
 		Foreground(muted).
 		Render("────────────────────────────")
 
-	// Final box
+	// Final Box
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(accent).
+		BorderForeground(muted).
 		Padding(1, 3).
 		Render(
 			lipgloss.JoinVertical(
 				lipgloss.Left,
 				styledBanner,
+				"",
 				subtitle,
 				"",
 				divider,
