@@ -18,15 +18,13 @@ func main() {
 			runInstall()
 			return
 		case "config":
-			handleConfig() // Now we handle the config command
+			handleConfig()
 			return
 		case "compress":
 			fmt.Println("Janitor is coming soon... (Step 3)")
 			return
 		}
 	}
-
-	// REMOVED: fmt.Println("ITS WORKING") <- This would break the hook!
 
 	handleHook()
 }
@@ -37,7 +35,7 @@ func handleConfig() {
 		return
 	}
 
-	cfg, _ := config.Load() // Loads current or creates defaults
+	cfg, _ := config.MustLoad()
 	key := os.Args[2]
 	val := os.Args[3]
 
@@ -63,26 +61,21 @@ func handleHook() {
 		return
 	}
 
-	// 1. LOAD CONFIG
-	// config.Load() automatically handles: "If file doesn't exist, return defaults"
-	cfg, err := config.Load()
+	cfg, err := config.MustLoad()
 	if err != nil {
 		return
 	}
 
-	// If user disabled Cogito in config, exit silently so Codex runs normally
 	if !cfg.Enabled {
 		return
 	}
 
-	// 2. Get all compressed memories from SQLite
 	memoriesRaw, _ := db.GetAllMemories()
 	var memTexts []string
 	for _, m := range memoriesRaw {
 		memTexts = append(memTexts, fmt.Sprintf("%s: %s", m.FilePath, m.CompressedText))
 	}
 
-	// 3. INJECT (Passing the config object as the 3rd argument)
 	context := injector.BuildFinalPrompt("Start session", memTexts, cfg)
 
 	output := map[string]interface{}{
@@ -101,15 +94,21 @@ func runInstall() {
 	execPath, _ := os.Executable()
 	cwd, _ := os.Getwd()
 
-	// 1. Create .cogito folder for configs (Use MkdirAll to prevent error if it exists)
-	cogitoDir := filepath.Join(os.Getenv("USERPROFILE"), ".cogito") // Use User Profile for Windows
+	// --- CROSS-PLATFORM FIX START ---
+	// Use os.UserHomeDir() instead of os.Getenv("USERPROFILE")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Printf("❌ Failed to find home directory: %v\n", err)
+		os.Exit(1)
+	}
+	cogitoDir := filepath.Join(home, ".cogito")
+	// --- CROSS-PLATFORM FIX END ---
+
 	os.MkdirAll(cogitoDir, 0755)
 
-	// 2. Initialize default config file immediately upon installation
 	defaultCfg := &config.Config{Enabled: true, Intensity: "full"}
 	config.Save(defaultCfg)
 
-	// 3. Install Codex Hooks
 	hooksDir := filepath.Join(cwd, ".codex")
 	os.MkdirAll(hooksDir, 0755)
 

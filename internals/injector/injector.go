@@ -1,8 +1,9 @@
 package injector
 
 import (
-	"cogito/internals/config"
 	"strings"
+
+	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/config"
 )
 
 var IntensityPrompts = map[string]string{
