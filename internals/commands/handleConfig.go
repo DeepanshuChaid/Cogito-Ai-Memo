@@ -57,10 +57,13 @@ func handleGet() {
 	switch key {
 	case "enabled":
 		fmt.Printf("enabled = %v\n", cfg.Enabled)
+
 	case "intensity":
 		fmt.Printf("intensity = %s\n", cfg.Intensity)
+
 	default:
 		fmt.Printf("❌ Unknown key: %s\n", key)
+
 	}
 }
 
