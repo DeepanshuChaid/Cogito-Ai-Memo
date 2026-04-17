@@ -3,12 +3,13 @@ package db
 import (
 	"database/sql"
 	_ "embed"
+	"fmt"
 	"os"
 	"path/filepath"
-	"time"
+	"strings"
 
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/models/schemaModels"
-	_ "modernc.org/sqlite" // Pure Go driver (no CGO required)
+	_ "modernc.org/sqlite"
 )
 
 //go:embed schema.sql
@@ -16,75 +17,111 @@ var schemaSQL string
 
 var DB *sql.DB
 
+func resolveDBPath() (string, error) {
+	var candidates []string
+
+	if cwd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, filepath.Join(cwd, ".cogito"))
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		homePath := filepath.Join(home, ".cogito")
+		if len(candidates) == 0 || candidates[0] != homePath {
+			candidates = append(candidates, homePath)
+		}
+	}
+
+	var errorsFound []string
+	for _, dirPath := range candidates {
+		if err := os.MkdirAll(dirPath, 0755); err != nil {
+			errorsFound = append(errorsFound, fmt.Sprintf("%s: %v", dirPath, err))
+			continue
+		}
+
+		dbPath := filepath.Join(dirPath, "cogito.db")
+		file, err := os.OpenFile(dbPath, os.O_CREATE|os.O_RDWR, 0644)
+		if err != nil {
+			errorsFound = append(errorsFound, fmt.Sprintf("%s: %v", dbPath, err))
+			continue
+		}
+		_ = file.Close()
+		return dbPath, nil
+	}
+
+	return "", fmt.Errorf("no writable db path found: %s", strings.Join(errorsFound, "; "))
+}
+
 func InitDB() error {
-	// 1. Setup the config directory (~/.cogito)
-	home, err := os.UserHomeDir()
+	dbPath, err := resolveDBPath()
 	if err != nil {
 		return err
 	}
 
-	dirPath := filepath.Join(home, ".cogito")
-	dbPath := filepath.Join(dirPath, "cogito.db")
-
-	if err := os.MkdirAll(dirPath, 0755); err != nil {
-		return err
-	}
-
-	// 2. Open the database using the "sqlite" driver
 	DB, err = sql.Open("sqlite", dbPath)
 	if err != nil {
 		return err
 	}
+	if err := DB.Ping(); err != nil {
+		return err
+	}
 
-	// 3. Execute the embedded schema
 	if _, err := DB.Exec(schemaSQL); err != nil {
+		return err
+	}
+	if _, err := DB.Exec(`
+		DROP TRIGGER IF EXISTS observations_ai;
+		DROP TABLE IF EXISTS observations_fts;
+		CREATE VIRTUAL TABLE observations_fts USING fts5(
+			title, compressed_text, facts, files_touched,
+			content='observations',
+			content_rowid='id'
+		);
+		CREATE TRIGGER observations_ai AFTER INSERT ON observations BEGIN
+			INSERT INTO observations_fts(rowid, title, compressed_text, facts, files_touched)
+			VALUES (new.id, new.title, new.compressed_text, new.facts, new.files_touched);
+		END;
+		INSERT INTO observations_fts(rowid, title, compressed_text, facts, files_touched)
+		SELECT id, title, compressed_text, facts, files_touched FROM observations;
+	`); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func GetRelevantObservations(cwd string, limit int) ([]schemaModels.Observations, error) {
-	// 1. Use a SQL query that:
-	// - Filters by the current project/folder
-	// - Prefers CompressedText over RawText
-	// - Sorts by newest first
-	// - Limits the number of results to avoid token overflow
+func GetAllMemories(cwd string, limit int) []schemaModels.Observation {
+	if DB == nil {
+		return nil
+	}
+
+	projectPath := filepath.Clean(strings.TrimSpace(cwd))
+	projectPathAlt := filepath.ToSlash(projectPath)
 
 	query := `
-		SELECT id, session_id, project, observation_type, raw_text, compressed_text, files_touched, created_at
+		SELECT compressed_text, files_touched
 		FROM observations
-		WHERE project = ?
+		WHERE project = ? OR project = ?
 		ORDER BY created_at DESC
-		Limit ?
+		LIMIT ?
 	`
 
-	rows, err := DB.Query(query, cwd, limit)
+	rows, err := DB.Query(query, projectPath, projectPathAlt, limit)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	defer rows.Close()
 
-	var observations []schemaModels.Observations
+	var observations []schemaModels.Observation
 
 	for rows.Next() {
-		var obs schemaModels.Observations
-		var createdAt string
-		err := rows.Scan(&obs.ID, &obs.SessionID, &obs.Project, &obs.ObservationType, &obs.RawText, &obs.CompressedText, &obs.FilesTouched, &createdAt)
+		var observation schemaModels.Observation
+
+		err := rows.Scan(&observation.CompressedText, &observation.FilesTouched)
 		if err != nil {
-			return nil, err
+			continue
 		}
-		obs.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-		observations = append(observations, obs)
+
+		observations = append(observations, observation)
 	}
 
-	return observations, nil
-}
-
-// Close shuts down the database connection pool.
-func Close() error {
-	if DB != nil {
-		return DB.Close()
-	}
-	return nil
+	return observations
 }
