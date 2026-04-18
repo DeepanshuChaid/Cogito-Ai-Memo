@@ -52,7 +52,7 @@ func main() {
 			return
 
 		default:
-			commands.Unkown(os.Args[1])
+			commands.Unknown(os.Args[1])
 			return
 		}
 	}

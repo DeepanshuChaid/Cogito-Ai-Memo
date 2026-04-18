@@ -18,36 +18,31 @@ var schemaSQL string
 var DB *sql.DB
 
 func resolveDBPath() (string, error) {
-	var candidates []string
+    // 1. Get the User Home Directory
+    home, err := os.UserHomeDir()
+    if err != nil {
+        return "", fmt.Errorf("could not find user home directory: %v", err)
+    }
 
-	if cwd, err := os.Getwd(); err == nil {
-		candidates = append(candidates, filepath.Join(cwd, ".cogito"))
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		homePath := filepath.Join(home, ".cogito")
-		if len(candidates) == 0 || candidates[0] != homePath {
-			candidates = append(candidates, homePath)
-		}
-	}
+    // 2. Define the global path (~/.cogito)
+    dirPath := filepath.Join(home, ".cogito")
 
-	var errorsFound []string
-	for _, dirPath := range candidates {
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
-			errorsFound = append(errorsFound, fmt.Sprintf("%s: %v", dirPath, err))
-			continue
-		}
+    // 3. Create the folder if it doesn't exist
+    if err := os.MkdirAll(dirPath, 0755); err != nil {
+        return "", fmt.Errorf("failed to create global config directory at %s: %v", dirPath, err)
+    }
 
-		dbPath := filepath.Join(dirPath, "cogito.db")
-		file, err := os.OpenFile(dbPath, os.O_CREATE|os.O_RDWR, 0644)
-		if err != nil {
-			errorsFound = append(errorsFound, fmt.Sprintf("%s: %v", dbPath, err))
-			continue
-		}
-		_ = file.Close()
-		return dbPath, nil
-	}
+    // 4. Set the DB file path
+    dbPath := filepath.Join(dirPath, "cogito.db")
 
-	return "", fmt.Errorf("no writable db path found: %s", strings.Join(errorsFound, "; "))
+    // 5. Verify writability by touching the file
+    file, err := os.OpenFile(dbPath, os.O_CREATE|os.O_RDWR, 0644)
+    if err != nil {
+        return "", fmt.Errorf("global database file %s is not writable: %v", dbPath, err)
+    }
+    file.Close()
+
+    return dbPath, nil
 }
 
 func InitDB() error {

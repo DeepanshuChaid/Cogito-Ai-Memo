@@ -2,7 +2,7 @@ package commands
 
 import "fmt"
 
-func Unkown(arg string) {
+func Unknown(arg string) {
 	fmt.Println("Unkown Command:", arg)
 	fmt.Println(`
 Commands:

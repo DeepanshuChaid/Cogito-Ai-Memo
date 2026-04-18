@@ -28,8 +28,19 @@ func GetConfigPath() string {
 	return filepath.Join(cwd, ".cogito", "config.json")
 }
 
+func GetConfigPathForDir(dir string) string {
+	if dir == "" {
+		return GetConfigPath()
+	}
+	return filepath.Join(dir, ".cogito", "config.json")
+}
+
 func Load() (*Config, error) {
-	path := GetConfigPath()
+	return LoadForDir("")
+}
+
+func LoadForDir(dir string) (*Config, error) {
+	path := GetConfigPathForDir(dir)
 
 	data, err := os.ReadFile(path)
 	if err != nil {
