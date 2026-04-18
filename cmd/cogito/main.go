@@ -61,96 +61,65 @@ func main() {
 }
 
 func handleHook() {
-
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
 		welcomeUi.ShowWelcomeUI()
 		return
 	}
 
-	// 1. Read the entire input into a byte slice
+	// 1. Read the input ONLY ONCE
 	rawInput, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG: Read Stdin Failed: %v\n", err)
+	if err != nil || len(rawInput) == 0 {
+		fmt.Fprintf(os.Stderr, "DEBUG: Read Stdin Failed or Empty: %v\n", err)
 		return
 	}
 
-	// 1. Read everything from Stdin
-    raw, err := io.ReadAll(os.Stdin)
-    if err != nil {
-        return
-    }
+	// 2. Clean the Windows garbage (Newlines, Returns, and UTF-8 BOM)
+	cleaned := bytes.ReplaceAll(rawInput, []byte("\r"), []byte(""))
+	cleaned = bytes.ReplaceAll(cleaned, []byte("\n"), []byte(""))
+	cleaned = bytes.TrimPrefix(cleaned, []byte("\xef\xbb\xbf"))
 
-    // 2. PowerShell might send bytes separated by Newlines/Carriage Returns
-    // This cleans up the 123 \n 34 \n 99 mess you saw in the debug
-    cleaned := bytes.ReplaceAll(raw, []byte("\r"), []byte(""))
-    cleaned = bytes.ReplaceAll(cleaned, []byte("\n"), []byte(""))
-
-    // 3. Strip the BOM (the 'ï' thing) if it's there
-    cleaned = bytes.TrimPrefix(cleaned, []byte("\xef\xbb\xbf"))
-
-    var input struct {
-        CWD string `json:"cwd"`
+	// 3. Parse the JSON
+	var input struct {
+		CWD    string `json:"cwd"`
 		Prompt string `json:"prompt"`
-    }
+	}
 
-    if err := json.Unmarshal(cleaned, &input); err != nil {
-        fmt.Fprintf(os.Stderr, "DEBUG: Still failing. Content: %s\n", string(cleaned))
-        return
-    }
-
-	// 2. Strip the UTF-8 BOM (0xEF, 0xBB, 0xBF) if it exists
-	// This is what is causing the 'ï' error
-	cleanedInput := bytes.TrimPrefix(rawInput, []byte("\xef\xbb\xbf"))
-
-	// 3. Unmarshal from the cleaned byte slice instead of using the decoder directly
-	if err := json.Unmarshal(cleanedInput, &input); err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG: JSON Decode Failed: %v\n", err)
-		// Print what we actually got so you can see it
-		fmt.Fprintf(os.Stderr, "DEBUG: Raw Input was: %s\n", string(cleanedInput))
+	if err := json.Unmarshal(cleaned, &input); err != nil {
+		fmt.Fprintf(os.Stderr, "DEBUG: JSON Decode Failed. Content: '%s' Error: %v\n", string(cleaned), err)
 		return
 	}
 
-    if (stat.Mode() & os.ModeCharDevice) != 0 {
-        welcomeUi.ShowWelcomeUI()
-        return
-    }
+	// 4. Load Config
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "DEBUG: Config Load Failed: %v\n", err)
+		return
+	}
 
+	if !cfg.Enabled {
+		fmt.Fprintf(os.Stderr, "DEBUG: Cogito is DISABLED in config\n")
+		return
+	}
 
-    // DEBUG 1: Is the JSON coming in correctly?
-    if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
-        fmt.Fprintf(os.Stderr, "DEBUG: JSON Decode Failed: %v\n", err)
-        return
-    }
+	// 5. Fetch Memories and Build Context
+	cwd, _ := os.Getwd()
+	memoriesRaw := db.GetAllMemories(cwd, 20)
 
-    cfg, err := config.Load()
-    // DEBUG 2: Is the config file actually there?
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "DEBUG: Config Load Failed: %v\n", err)
-        return
-    }
+	var memTexts []string
+	for _, m := range memoriesRaw {
+		memTexts = append(memTexts, fmt.Sprintf("%s: %s", m.FilesTouched, m.CompressedText))
+	}
 
-    // DEBUG 3: Is it just turned off?
-    if !cfg.Enabled {
-        fmt.Fprintf(os.Stderr, "DEBUG: Cogito is DISABLED in config\n")
-        return
-    }
-    cwd, _ := os.Getwd()
-    memoriesRaw := db.GetAllMemories(cwd, 20)
+	context := injector.BuildFinalPrompt("Start session", memTexts, cfg)
 
-    var memTexts []string
-    for _, m := range memoriesRaw {
-        memTexts = append(memTexts, fmt.Sprintf("%s: %s", m.FilesTouched, m.CompressedText))
-    }
+	// 6. Output to the AI
+	output := map[string]interface{}{
+		"continue":       true,
+		"suppressOutput": true,
+		"systemMessage":  context,
+	}
 
-    context := injector.BuildFinalPrompt("Start session", memTexts, cfg)
-
-    output := map[string]interface{}{
-        "continue":       true,
-        "suppressOutput": true,
-        "systemMessage":  context,
-    }
-
-    jsonOut, _ := json.Marshal(output)
-    fmt.Println(string(jsonOut))
+	jsonOut, _ := json.Marshal(output)
+	fmt.Println(string(jsonOut))
 }

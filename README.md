@@ -11,3 +11,9 @@
 ```bash
 go install ./cmd/cogito
 ```
+
+# Testing
+
+```bash
+'{"cwd":"C:\\Users\\HP\\downloads\\coding\\cogito","prompt":"hi"}' | go run .\cmd\cogito\main.go
+```

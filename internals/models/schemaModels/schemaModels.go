@@ -49,6 +49,23 @@ type Observation struct {
 }
 
 
+type ObservationTeaser struct {
+	ID int `json:"id"`
+	ObsType         string    `json:"obs_type"`           // bugfix, decision, discovery, feature, refactor
+	Title           string    `json:"title"`              // Short 1-sentence summary
+	FilesTouched    string    `json:"files_touched"`      // JSON array of file paths
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// =============================================================================
+// OBSERVATION SEARCH RESULT (observations_fts virtual table)
+// For Progressive Disclosure - Step 1 (Cheap Token Cost)
+// =============================================================================
+type ObservationSearchResult struct {
+	ID    int     `json:"id"`
+	Title string  `json:"title"`
+	Rank  float64 `json:"rank"`
+}
 
 // =============================================================================
 // SESSION SUMMARIES (session_summaries table)
@@ -65,3 +82,4 @@ type SessionSummary struct {
 	NextSteps     string    `json:"next_steps"`     // What's next
 	CreatedAt     time.Time `json:"created_at"`
 }
+
