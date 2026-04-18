@@ -60,10 +60,10 @@ func main() {
 		}
 	}
 
-	handleHook()
+	// handleHook()
 }
 
-func handleHook() {
+func HandleHook() {
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
 		welcomeUi.ShowWelcomeUI()

@@ -25,6 +25,10 @@ func Install() {
 	hooksDir := filepath.Join(cwd, ".codex")
 	os.MkdirAll(hooksDir, 0755)
 
+	// FOR EDGE CASE WE GONNA WRITE IT IN THE HOME DIR AS WELL
+	homeDir, _ := os.UserHomeDir()
+	homeCodexDir := filepath.Join(homeDir, ".codex")
+
 	// ✅ All 3 Hooks with args
 	hooksConfig := map[string]interface{}{
 		"hooks": map[string]interface{}{
@@ -54,6 +58,7 @@ func Install() {
 
 	content, _ := json.MarshalIndent(hooksConfig, "", "  ")
 	os.WriteFile(filepath.Join(hooksDir, "hooks.json"), content, 0644)
+	os.WriteFile(filepath.Join(homeCodexDir, "hooks.json"), content, 0644)
 
 	fmt.Println("✅ Cogito hooks installed successfully!")
 	fmt.Println("📍 Config:", filepath.Join(hooksDir, "hooks.json"))

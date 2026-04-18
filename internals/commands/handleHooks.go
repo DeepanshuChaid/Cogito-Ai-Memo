@@ -11,6 +11,7 @@ import (
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/config"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/db"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/injector"
+	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/utils/hooklog"
 )
 
 func HandleHooks(hookType string) {
@@ -37,6 +38,10 @@ func handleSessionStart() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ SessionStart: Read Failed: %v\n", err)
 		return
+	}
+	if err := hooklog.Log("SessionStart", string(rawInput)); err != nil {
+		// During manual debugging you can see the problem:
+		fmt.Fprintf(os.Stderr, "⚠️  Could not write hook log: %v\n", err)
 	}
 
 	// CLEAN
