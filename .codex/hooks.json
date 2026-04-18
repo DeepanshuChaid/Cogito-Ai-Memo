@@ -1,7 +1,31 @@
 {
   "hooks": {
+    "PostToolUse": [
+      {
+        "args": [
+          "hook",
+          "tool-use"
+        ],
+        "command": "C:\\Users\\HP\\go\\bin\\cogito.exe",
+        "type": "command"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "args": [
+          "hook",
+          "session-end"
+        ],
+        "command": "C:\\Users\\HP\\go\\bin\\cogito.exe",
+        "type": "command"
+      }
+    ],
     "SessionStart": [
       {
+        "args": [
+          "hook",
+          "session-start"
+        ],
         "command": "C:\\Users\\HP\\go\\bin\\cogito.exe",
         "type": "command"
       }

@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 
-	// "path/filepath"
-
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/commands"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/config"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/db"
@@ -18,11 +16,12 @@ import (
 
 func main() {
 	if err := db.InitDB(); err != nil {
-        fmt.Fprintf(os.Stderr, "Critical Error: Could not initialize DB: %v\n", err)
-        os.Exit(1)
-    }
+		fmt.Fprintf(os.Stderr, "Critical Error: Could not initialize DB: %v\n", err)
+		os.Exit(1)
+	}
 
-	fmt.Println("DB INTIALIZED SUCCESSFULLY!")
+	// DO NOT PRINT ANYTHING TO STDOUT HERE.
+	// Codex expects pure JSON output only.
 
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -51,6 +50,10 @@ func main() {
 			fmt.Println("Janitor is coming soon... (Step 3)")
 			return
 
+		case "hook":
+			commands.HandleHooks(os.Args[2])
+			return
+
 		default:
 			commands.Unknown(os.Args[1])
 			return
@@ -67,42 +70,44 @@ func handleHook() {
 		return
 	}
 
-	// 1. Read the input ONLY ONCE
+	// 1. Read everything from Stdin EXACTLY ONCE
 	rawInput, err := io.ReadAll(os.Stdin)
-	if err != nil || len(rawInput) == 0 {
-		fmt.Fprintf(os.Stderr, "DEBUG: Read Stdin Failed or Empty: %v\n", err)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "DEBUG: Read Stdin Failed: %v\n", err)
 		return
 	}
 
-	// 2. Clean the Windows garbage (Newlines, Returns, and UTF-8 BOM)
+	// 2. Clean the Windows carriage returns, newlines, and UTF-8 BOM
 	cleaned := bytes.ReplaceAll(rawInput, []byte("\r"), []byte(""))
 	cleaned = bytes.ReplaceAll(cleaned, []byte("\n"), []byte(""))
 	cleaned = bytes.TrimPrefix(cleaned, []byte("\xef\xbb\xbf"))
 
-	// 3. Parse the JSON
+	// 3. Define the struct for the incoming JSON from Codex
 	var input struct {
 		CWD    string `json:"cwd"`
 		Prompt string `json:"prompt"`
 	}
 
+	// 4. Parse the cleaned JSON
 	if err := json.Unmarshal(cleaned, &input); err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG: JSON Decode Failed. Content: '%s' Error: %v\n", string(cleaned), err)
+		fmt.Fprintf(os.Stderr, "DEBUG: JSON Decode Failed. Content: '%s', Error: %v\n", string(cleaned), err)
 		return
 	}
 
-	// 4. Load Config
+	// 5. Load Cogito Config
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "DEBUG: Config Load Failed: %v\n", err)
 		return
 	}
 
+	// 6. Check if Enabled
 	if !cfg.Enabled {
 		fmt.Fprintf(os.Stderr, "DEBUG: Cogito is DISABLED in config\n")
 		return
 	}
 
-	// 5. Fetch Memories and Build Context
+	// 7. Get Memories and Build Context
 	cwd, _ := os.Getwd()
 	memoriesRaw := db.GetAllMemories(cwd, 20)
 
@@ -113,7 +118,7 @@ func handleHook() {
 
 	context := injector.BuildFinalPrompt("Start session", memTexts, cfg)
 
-	// 6. Output to the AI
+	// 8. Output the final JSON for Codex
 	output := map[string]interface{}{
 		"continue":       true,
 		"suppressOutput": true,

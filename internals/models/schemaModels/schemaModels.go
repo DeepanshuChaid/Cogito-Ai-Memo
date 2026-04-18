@@ -9,12 +9,12 @@ import "time"
 type Session struct {
 	ID                int       `json:"id"`
 	ContentSessionID  string    `json:"content_session_id"` // The IDE/Codex Session ID
-	MemorySessionID   string    `json:"memory_session_id"`  // Cogito's Unique ID (can be null initially)
+	MemorySessionID   *string    `json:"memory_session_id"`  // Cogito's Unique ID (can be null initially)
 	Project           string    `json:"project"`            // Absolute CWD Path
 	Status            string    `json:"status"`             // active, completed, failed
 	UserPrompt        string    `json:"user_prompt"`        // Initial prompt that started session
 	StartedAt         time.Time `json:"started_at"`
-	CompletedAt       time.Time `json:"completed_at"`
+	CompletedAt       *time.Time `json:"completed_at"`
 }
 
 

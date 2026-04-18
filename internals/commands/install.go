@@ -13,7 +13,7 @@ func Install() {
 	configTui.RunConfigTUI()
 
 	execPath, _ := os.Executable()
-	execPath, _ = filepath.EvalSymlinks(execPath) // 🔥 important
+	execPath, _ = filepath.EvalSymlinks(execPath)
 
 	cwd, _ := os.Getwd()
 
@@ -25,16 +25,28 @@ func Install() {
 	hooksDir := filepath.Join(cwd, ".codex")
 	os.MkdirAll(hooksDir, 0755)
 
-	// ✅ Quote path (Windows-safe)
-	// commandPath := fmt.Sprintf("\"%s\"", execPath)
-	commandPath := execPath // ✅ correct
-
+	// ✅ All 3 Hooks with args
 	hooksConfig := map[string]interface{}{
 		"hooks": map[string]interface{}{
-			"SessionStart": []map[string]string{
+			"SessionStart": []map[string]interface{}{
 				{
 					"type":    "command",
-					"command": commandPath,
+					"command": execPath,
+					"args":    []string{"hook", "session-start"},
+				},
+			},
+			"PostToolUse": []map[string]interface{}{
+				{
+					"type":    "command",
+					"command": execPath,
+					"args":    []string{"hook", "tool-use"},
+				},
+			},
+			"SessionEnd": []map[string]interface{}{
+				{
+					"type":    "command",
+					"command": execPath,
+					"args":    []string{"hook", "session-end"},
 				},
 			},
 		},
@@ -43,5 +55,10 @@ func Install() {
 	content, _ := json.MarshalIndent(hooksConfig, "", "  ")
 	os.WriteFile(filepath.Join(hooksDir, "hooks.json"), content, 0644)
 
-	fmt.Println("✅ Hook installed successfully!")
+	fmt.Println("✅ Cogito hooks installed successfully!")
+	fmt.Println("📍 Config:", filepath.Join(hooksDir, "hooks.json"))
+	fmt.Println("\nRegistered hooks:")
+	fmt.Println("  - SessionStart  → cogito hook session-start")
+	fmt.Println("  - PostToolUse   → cogito hook tool-use")
+	fmt.Println("  - SessionEnd    → cogito hook session-end")
 }
