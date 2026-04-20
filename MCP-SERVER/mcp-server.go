@@ -1,84 +1,116 @@
 package main
 
 import (
-    "encoding/json"
+	"bytes"
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
-	"time"
+	"path/filepath"
 )
 
-// SaveObservation logs tool use to file
-func SaveObservation(tool string, input, output string) {
-    data, _ := json.MarshalIndent(map[string]interface{}{
-        "time":   time.Now().Unix(),
-        "tool":   tool,
-        "input":  input,
-        "output": output,
-    }, "", "  ")
-    os.WriteFile(".cogito/last_action.json", data, 0644)
+type JSONRPCRequest struct {
+	JSONRPC string                 `json:"jsonrpc"`
+	ID      *json.RawMessage       `json:"id,omitempty"` // Pointer lets us check if it's nil
+	Method  string                 `json:"method"`
+	Params  map[string]interface{} `json:"params"`
 }
 
-// GET /mcp/tools — required by MCP
-func toolsHandler(w http.ResponseWriter, r *http.Request) {
-    tools := []map[string]interface{}{
-        {
-            "name":        "on_tool_use",
-            "description": "Internal: receive tool usage from Codex",
-            "input_schema": map[string]interface{}{
-                "type":       "object",
-                "properties": map[string]map[string]string{},
-            },
-        },
-    }
-
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]interface{}{
-        "tools": tools,
-    })
+type JSONRPCResponse struct {
+	JSONRPC string           `json:"jsonrpc"`
+	ID      *json.RawMessage `json:"id"`
+	Result  interface{}      `json:"result,omitempty"`
 }
 
-// POST /mcp/invoke — Codex sends events here
-func invokeHandler(w http.ResponseWriter, r *http.Request) {
-    var body map[string]interface{}
-    json.NewDecoder(r.Body).Decode(&body)
+// --- Middleware: Noir Logger ---
+func inspector(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		r.Body = io.NopCloser(bytes.NewBuffer(body))
+		log.Printf("DEBUG: %s | %s", r.URL.Path, string(body))
+		next(w, r)
+	}
+}
 
-    toolName := body["name"].(string)
-    args := body["arguments"].(map[string]interface{})
+func mainHandler(w http.ResponseWriter, r *http.Request) {
+	var req JSONRPCRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return
+	}
 
-    input, _ := json.Marshal(args["input"])
-    output, _ := json.Marshal(args["output"])
+	// 1. NOTIFICATION CHECK (The fix)
+	// If ID is nil, it's a notification. We MUST NOT send a response body.
+	if req.ID == nil {
+		w.WriteHeader(http.StatusNoContent)
+		log.Printf("NOTIFICATION: %s handled.", req.Method)
+		return
+	}
 
-    // Log to file
-	SaveObservation(toolName, string(input), string(output))
-
-    // Respond
 	w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"content": "Logged",
-    })
+	var result interface{}
+
+	// 2. ROUTING
+	switch req.Method {
+	case "initialize":
+		result = map[string]interface{}{
+			"protocolVersion": "2025-06-18", // Sync with your client's version
+			"capabilities":    map[string]interface{}{"tools": map[string]interface{}{}},
+			"serverInfo":      map[string]string{"name": "cogito", "version": "0.1.0"},
+		}
+
+	case "tools/list":
+		result = map[string]interface{}{
+			"tools": []map[string]interface{}{
+				{
+					"name":        "get_codebase_map",
+					"description": "Returns full file tree.",
+					"inputSchema": map[string]interface{}{"type": "object", "properties": map[string]interface{}{}},
+				},
+			},
+		}
+
+	case "tools/call":
+		name, _ := req.Params["name"].(string)
+		var output string
+		if name == "get_codebase_map" {
+			filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+				if err == nil && !info.IsDir() && !filepath.HasPrefix(path, ".") {
+					output += path + "\n"
+				}
+				return nil
+			})
+		}
+		result = map[string]interface{}{
+			"content": []map[string]interface{}{{"type": "text", "text": output}},
+		}
+
+	default:
+		result = map[string]string{"status": "unknown_method"}
+	}
+
+	// 3. SEND RESPONSE
+	resp := JSONRPCResponse{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  result,
+	}
+	json.NewEncoder(w).Encode(resp)
 }
 
 func main() {
-    os.MkdirAll(".cogito", 0755)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", inspector(mainHandler))
 
-    // Log every request
-http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        log.Printf("🚨 %s %s", r.Method, r.URL.Path)
+	// Some clients look for these specific paths
+	mux.HandleFunc("/mcp/initialize", inspector(mainHandler))
+	mux.HandleFunc("/mcp/tools", inspector(mainHandler))
 
-        if r.URL.Path == "/mcp/tools" {
-            toolsHandler(w, r)
-            return
-}
-        if r.URL.Path == "/mcp/invoke" {
-            invokeHandler(w, r)
-            return
-}
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
 
-        log.Printf("❌ 404: %s", r.URL.Path)
-        http.Error(w, "not found", http.StatusNotFound)
-    })
-
-    log.Println("✅ MCP Server: Listening on :8080")
-    log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Println("💀 Cogito MCP: Ready for deployment on :8080")
+	log.Fatal(server.ListenAndServe())
 }
