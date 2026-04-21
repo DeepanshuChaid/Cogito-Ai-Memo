@@ -12,6 +12,7 @@ import (
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/db"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/injector"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/utils/welcomeUi"
+	"github.com/DeepanshuChaid/Cogito-Ai.git/mcpServer"
 )
 
 func main() {
@@ -52,6 +53,10 @@ func main() {
 
 		case "hook":
 			commands.HandleHooks(os.Args[2])
+			return
+
+		case "serve-mcp":
+			mcpServer.ServeMcp()
 			return
 
 		default:
