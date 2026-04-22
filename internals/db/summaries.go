@@ -9,12 +9,12 @@ import (
 
 // CreateSessionSummary writes the global context (SessionEnd)
 // Called by: summary-hook
-func CreateSessionSummary(memorySessionID, project, request, learned, nextSteps string) error {
+func CreateSessionSummary(SessionID, project, request, learned, nextSteps string) error {
 	now := time.Now()
 	_, err := DB.Exec(`
-		INSERT INTO session_summaries (memory_session_id, project, request, learned, next_steps, created_at)
+		INSERT INTO session_summaries (session_id, project, request, learned, next_steps, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`, memorySessionID, project, request, learned, nextSteps, now.Format("2006-01-02 15:04:05"))
+	`, SessionID, project, request, learned, nextSteps, now.Format("2006-01-02 15:04:05"))
 	return err
 }
 
@@ -25,13 +25,13 @@ func GetLatestSessionSummary(project string) (*schemaModels.SessionSummary, erro
 	var createdAt string
 
 	err := DB.QueryRow(`
-		SELECT id, memory_session_id, project, request, learned, next_steps, created_at
+		SELECT id, session_id, project, request, learned, next_steps, created_at
 		FROM session_summaries
 		WHERE project = ?
 		ORDER BY created_at DESC
 		LIMIT 1
 	`, project).Scan(
-		&summary.ID, &summary.MemorySessionID, &summary.Project,
+		&summary.ID, &summary.SessionID, &summary.Project,
 		&summary.Request, &summary.Learned, &summary.NextSteps, &createdAt,
 	)
 

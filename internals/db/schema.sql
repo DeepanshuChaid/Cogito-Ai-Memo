@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS sdk_sessions (
 -- This is crucial. Hooks write here instantly. Worker processes this async.
 CREATE TABLE IF NOT EXISTS pending_observations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    memory_session_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
     raw_input TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     processed BOOLEAN DEFAULT 0
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS pending_observations (
 -- Worker writes here after LLM distillation
 CREATE TABLE IF NOT EXISTS observations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    memory_session_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
     project TEXT NOT NULL,
     obs_type TEXT,                           -- bugfix, decision, discovery
     title TEXT,                              -- Short summary
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS observations (
 -- Generated at SessionEnd
 CREATE TABLE IF NOT EXISTS session_summaries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    memory_session_id TEXT UNIQUE NOT NULL,
+    session_id TEXT UNIQUE NOT NULL,
     project TEXT NOT NULL,
     request TEXT,                            -- What user asked
     learned TEXT,                            -- What AI learned
