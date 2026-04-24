@@ -12,22 +12,36 @@ import (
 )
 
 type FileMap struct {
-	Path       string   `json:"path"`
-	Package    string   `json:"package"`
-	Imports    []string `json:"imports"`
-	Functions  []string `json:"functions"`
-	Structs    []string `json:"structs"`
-	Interfaces []string `json:"interfaces"`
-	Methods    []Method `json:"methods"`
+	Path       string         `json:"path,omitempty"`
+	Package    string         `json:"package,omitempty"`
+	Imports    []string       `json:"imports,omitempty"`
+	Functions  []Function     `json:"functions,omitempty"`
+	Structs    []string       `json:"structs,omitempty"`
+	Interfaces []string       `json:"interfaces,omitempty"`
+	Methods    []Method       `json:"methods,omitempty"`
+	Language   string         `json:"language,omitempty"`
+	Classes    []string       `json:"classes,omitempty"`
+	Calls      []CallRelation `json:"calls,omitempty"`
+}
+
+type CallRelation struct {
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
+}
+
+
+type Function struct {
+	Name string `json:"name,omitempty"`
+	Line int   `json:"line,omitempty"`
 }
 
 type Method struct {
-	Receiver string `json:"receiver"`
-	Name     string `json:"name"`
+	Receiver string `json:"receiver,omitempty"`
+	Name     string `json:"name,omitempty"`
 }
 
 type CodebaseMap struct {
-	Files []FileMap `json:"files"`
+	Files []FileMap `json:"files,omitempty"`
 }
 
 func BuildMap() {
@@ -57,11 +71,24 @@ func BuildMap() {
 			return nil
 		}
 
-		if !strings.HasSuffix(path, ".go") {
+		ext := strings.ToLower(filepath.Ext(path))
+
+		supported := map[string]bool{
+			".go":   true,
+			".py":   true,
+			".js":   true,
+			".jsx":  true,
+			".ts":   true,
+			".tsx":  true,
+			".java": true,
+		}
+
+		if !supported[ext] {
 			return nil
 		}
 
-		fileMap := parseGoFile(path)
+
+		fileMap := parseFile(path)
 		result.Files = append(result.Files, fileMap)
 
 		return nil
@@ -117,14 +144,17 @@ func parseGoFile(path string) FileMap {
 		switch d := decl.(type) {
 
 		case *ast.FuncDecl:
+			funcName := d.Name.Name
 			if d.Recv == nil {
 				fileMap.Functions = append(
 					fileMap.Functions,
-					d.Name.Name,
+					Function{
+						Name: funcName,
+						Line: fset.Position(d.Pos()).Line,
+					},
 				)
 			} else {
 				receiver := ""
-
 				if len(d.Recv.List) > 0 {
 					switch r := d.Recv.List[0].Type.(type) {
 					case *ast.Ident:
@@ -135,14 +165,39 @@ func parseGoFile(path string) FileMap {
 						}
 					}
 				}
-
 				fileMap.Methods = append(
 					fileMap.Methods,
 					Method{
 						Receiver: receiver,
-						Name:     d.Name.Name,
+						Name:     funcName,
 					},
 				)
+			}
+
+			// Detect calls within the function body
+			if d.Body != nil {
+				ast.Inspect(d.Body, func(n ast.Node) bool {
+					call, ok := n.(*ast.CallExpr)
+					if !ok {
+						return true
+					}
+
+					var calleeName string
+					switch fun := call.Fun.(type) {
+					case *ast.Ident:
+						calleeName = fun.Name
+					case *ast.SelectorExpr:
+						calleeName = fun.Sel.Name
+					}
+
+					if calleeName != "" {
+						fileMap.Calls = append(fileMap.Calls, CallRelation{
+							From: funcName,
+							To:   calleeName,
+						})
+					}
+					return true
+				})
 			}
 
 		case *ast.GenDecl:
@@ -163,6 +218,251 @@ func parseGoFile(path string) FileMap {
 					fileMap.Interfaces = append(
 						fileMap.Interfaces,
 						typeSpec.Name.Name,
+					)
+				}
+			}
+		}
+	}
+
+	return fileMap
+}
+
+func parseFile(path string) FileMap {
+	ext := strings.ToLower(filepath.Ext(path))
+
+	switch ext {
+	case ".go":
+		return parseGoFile(path)
+
+	case ".py":
+		return parsePythonFile(path)
+
+	case ".js", ".jsx", ".ts", ".tsx":
+		return parseJSFile(path)
+
+	case ".java":
+		return parseJavaFile(path)
+
+	default:
+		return FileMap{
+			Path: path,
+		}
+	}
+}
+
+func parsePythonFile(path string) FileMap {
+	content, _ := os.ReadFile(path)
+	text := string(content)
+
+	fileMap := FileMap{
+		Path:     path,
+		Language: "python",
+	}
+
+	lines := strings.Split(text, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if strings.HasPrefix(line, "import ") || strings.HasPrefix(line, "from ") {
+			fileMap.Imports = append(fileMap.Imports, line)
+			continue
+		}
+
+		// Function detection (including async def)
+		if strings.HasPrefix(line, "def ") || strings.HasPrefix(line, "async def ") {
+			trimmed := strings.TrimPrefix(line, "async ")
+			trimmed = strings.TrimPrefix(trimmed, "def ")
+			name := strings.Split(trimmed, "(")[0]
+			name = strings.TrimSpace(name)
+			if name != "" {
+				fileMap.Functions = append(fileMap.Functions, Function{
+					Name: name,
+				})
+			}
+			continue
+		}
+
+		// Class detection
+		if strings.HasPrefix(line, "class ") {
+			name := strings.TrimPrefix(line, "class ")
+			name = strings.Split(name, "(")[0]
+			name = strings.Split(name, ":")[0]
+			name = strings.TrimSpace(name)
+			if name != "" {
+				fileMap.Classes = append(fileMap.Classes, name)
+			}
+			continue
+		}
+
+		// Basic decorator detection (adding to imports or a new field if we had one, but let's just ignore for now or log)
+		// User mentioned "decorators awareness"
+	}
+
+	return fileMap
+}
+
+
+
+func parseJSFile(path string) FileMap {
+	content, _ := os.ReadFile(path)
+	text := string(content)
+
+	fileMap := FileMap{
+		Path:     path,
+		Language: "javascript",
+	}
+
+	lines := strings.Split(text, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if strings.HasPrefix(line, "import ") {
+			fileMap.Imports = append(fileMap.Imports, line)
+			continue
+		}
+
+		// function declarations and exports
+		if strings.Contains(line, "function ") {
+			trimmed := strings.TrimPrefix(line, "export ")
+			trimmed = strings.TrimPrefix(trimmed, "default ")
+			if strings.HasPrefix(trimmed, "function ") {
+				name := strings.Split(strings.TrimPrefix(trimmed, "function "), "(")[0]
+				name = strings.TrimSpace(name)
+				if name != "" {
+					fileMap.Functions = append(fileMap.Functions, Function{
+						Name: name,
+					})
+				}
+				continue
+			}
+		}
+
+		// arrow functions: const name = (...) =>
+		if (strings.Contains(line, "const ") || strings.Contains(line, "let ") || strings.Contains(line, "var ")) &&
+			strings.Contains(line, "=>") {
+			parts := strings.Split(line, "=")
+			if len(parts) > 1 {
+				decl := strings.Fields(parts[0])
+				if len(decl) > 0 {
+					name := decl[len(decl)-1]
+					fileMap.Functions = append(fileMap.Functions, Function{
+						Name: name,
+					})
+				}
+			}
+			continue
+		}
+
+		// Class detection
+		if strings.Contains(line, "class ") {
+			trimmed := strings.TrimPrefix(line, "export ")
+			trimmed = strings.TrimPrefix(trimmed, "default ")
+			if strings.HasPrefix(trimmed, "class ") {
+				name := strings.Split(strings.TrimPrefix(trimmed, "class "), " ")[0]
+				name = strings.Trim(name, "{")
+				name = strings.TrimSpace(name)
+				if name != "" {
+					fileMap.Classes = append(fileMap.Classes, name)
+				}
+			}
+			continue
+		}
+	}
+
+	return fileMap
+}
+
+func parseJavaFile(path string) FileMap {
+	content, _ := os.ReadFile(path)
+	text := string(content)
+
+	fileMap := FileMap{
+		Path:     path,
+		Language: "java",
+	}
+
+	lines := strings.Split(text, "\n")
+
+	for i, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// package com.example;
+		if strings.HasPrefix(line, "package ") {
+			pkg := strings.TrimPrefix(line, "package ")
+			pkg = strings.TrimSuffix(pkg, ";")
+			fileMap.Package = pkg
+		}
+
+		// import java.util.List;
+		if strings.HasPrefix(line, "import ") {
+			imp := strings.TrimPrefix(line, "import ")
+			imp = strings.TrimSuffix(imp, ";")
+			fileMap.Imports = append(fileMap.Imports, imp)
+		}
+
+		// public class User {
+		if strings.Contains(line, " class ") ||
+			strings.HasPrefix(line, "class ") {
+
+			parts := strings.Fields(line)
+
+			for idx, part := range parts {
+				if part == "class" && idx+1 < len(parts) {
+					fileMap.Classes = append(
+						fileMap.Classes,
+						strings.Trim(parts[idx+1], "{"),
+					)
+					break
+				}
+			}
+		}
+
+		// public interface UserService {
+		if strings.Contains(line, " interface ") ||
+			strings.HasPrefix(line, "interface ") {
+
+			parts := strings.Fields(line)
+
+			for idx, part := range parts {
+				if part == "interface" && idx+1 < len(parts) {
+					fileMap.Interfaces = append(
+						fileMap.Interfaces,
+						strings.Trim(parts[idx+1], "{"),
+					)
+					break
+				}
+			}
+		}
+
+		// simple method detection
+		// public void login() {
+		if strings.Contains(line, "(") &&
+			strings.Contains(line, ")") &&
+			strings.Contains(line, "{") &&
+			!strings.Contains(line, "if") &&
+			!strings.Contains(line, "for") &&
+			!strings.Contains(line, "while") &&
+			!strings.Contains(line, "switch") &&
+			!strings.Contains(line, "catch") {
+
+			beforeParen := strings.Split(line, "(")[0]
+			parts := strings.Fields(beforeParen)
+
+			if len(parts) > 0 {
+				name := parts[len(parts)-1]
+
+				if name != "class" &&
+					name != "interface" &&
+					name != "new" {
+
+					fileMap.Functions = append(
+						fileMap.Functions,
+						Function{
+							Name: name,
+							Line: i + 1,
+						},
 					)
 				}
 			}
