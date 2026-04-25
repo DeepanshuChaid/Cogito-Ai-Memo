@@ -8,11 +8,15 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
 type FileMap struct {
 	Path       string         `json:"path,omitempty"`
+	Importance int            `json:"importance,omitempty"`
+	Role       string         `json:"role,omitempty"`
+	Summary    string         `json:"summary,omitempty"`
 	Package    string         `json:"package,omitempty"`
 	Imports    []string       `json:"imports,omitempty"`
 	Functions  []Function     `json:"functions,omitempty"`
@@ -22,6 +26,7 @@ type FileMap struct {
 	Language   string         `json:"language,omitempty"`
 	Classes    []string       `json:"classes,omitempty"`
 	Calls      []CallRelation `json:"calls,omitempty"`
+	Ignore     bool           `json:"ignore,omitempty"`
 }
 
 type CallRelation struct {
@@ -40,8 +45,14 @@ type Method struct {
 	Name     string `json:"name,omitempty"`
 }
 
+type ExecutionFlow struct {
+	Name  string   `json:"name,omitempty"`
+	Steps []string `json:"steps,omitempty"`
+}
+
 type CodebaseMap struct {
-	Files []FileMap `json:"files,omitempty"`
+	Files []FileMap       `json:"files,omitempty"`
+	Flows []ExecutionFlow `json:"flows,omitempty"`
 }
 
 func BuildMap() {
@@ -87,12 +98,28 @@ func BuildMap() {
 			return nil
 		}
 
-
 		fileMap := parseFile(path)
+
+		// Post-process file
+		fileMap.Importance = calculateImportance(&fileMap)
+		fileMap.Role = classifyRole(path, &fileMap)
+		fileMap.Ignore = isIgnoreZone(path)
+
 		result.Files = append(result.Files, fileMap)
 
 		return nil
 	})
+
+	// Sort files by importance (descending)
+	sort.Slice(result.Files, func(i, j int) bool {
+		if result.Files[i].Importance != result.Files[j].Importance {
+			return result.Files[i].Importance > result.Files[j].Importance
+		}
+		return result.Files[i].Path < result.Files[j].Path
+	})
+
+	// Generate execution flows
+	result.Flows = generateExecutionFlows(result.Files)
 
 	os.MkdirAll(".cogito", os.ModePerm)
 
@@ -131,6 +158,18 @@ func parseGoFile(path string) FileMap {
 	fileMap := FileMap{
 		Path:    path,
 		Package: node.Name.Name,
+	}
+
+	if node.Doc != nil {
+		fileMap.Summary = strings.TrimSpace(node.Doc.Text())
+	} else {
+		// Fallback to searching first comment in file
+		for _, cg := range node.Comments {
+			if cg.Pos() < node.Name.Pos() {
+				fileMap.Summary = strings.TrimSpace(cg.Text())
+				break
+			}
+		}
 	}
 
 	for _, imp := range node.Imports {
@@ -190,7 +229,7 @@ func parseGoFile(path string) FileMap {
 						calleeName = fun.Sel.Name
 					}
 
-					if calleeName != "" {
+					if calleeName != "" && !isLowValueCall(calleeName) {
 						fileMap.Calls = append(fileMap.Calls, CallRelation{
 							From: funcName,
 							To:   calleeName,
@@ -470,4 +509,159 @@ func parseJavaFile(path string) FileMap {
 	}
 
 	return fileMap
+}
+
+func isLowValueCall(name string) bool {
+	lowValue := map[string]bool{
+		"len": true, "append": true, "cap": true, "make": true, "new": true,
+		"string": true, "int": true, "int64": true, "float64": true,
+		"Println": true, "Printf": true, "Print": true, "Sprintf": true,
+		"Error": true, "Errorf": true, "Exit": true, "Fatal": true, "Fatalf": true,
+		"Panic": true, "recover": true, "close": true, "delete": true,
+		"copy": true, "real": true, "imag": true, "complex": true,
+	}
+	return lowValue[name]
+}
+
+func calculateImportance(f *FileMap) int {
+	if isEntryPoint(f.Path, f) {
+		return 10
+	}
+
+	score := 1
+	score += len(f.Functions)
+	score += len(f.Structs) * 2
+	score += len(f.Interfaces) * 3
+
+	// Boost for exported items
+	for _, fn := range f.Functions {
+		if len(fn.Name) > 0 && fn.Name[0] >= 'A' && fn.Name[0] <= 'Z' {
+			score += 2
+		}
+	}
+
+	// Boost for other potential entrypoints or high-level cmd files
+	if strings.Contains(f.Path, "cmd/") || strings.Contains(f.Path, "main") {
+		score += 5
+	}
+
+	// Cap at 10
+	if score > 10 {
+		return 10
+	}
+	return score
+}
+
+func classifyRole(path string, f *FileMap) string {
+	if isEntryPoint(path, f) {
+		return "entrypoint"
+	}
+
+	p := strings.ToLower(path)
+	if strings.Contains(p, "db/") || strings.Contains(p, "database") || strings.Contains(p, "repository") {
+		return "database"
+	}
+	if strings.Contains(p, "mcp") {
+		return "mcp-server"
+	}
+	if strings.Contains(p, "session") {
+		return "session-manager"
+	}
+	if strings.Contains(p, "worker") || strings.Contains(p, "job") {
+		return "worker"
+	}
+	if strings.Contains(p, "adapter") {
+		return "adapter"
+	}
+	if strings.Contains(p, "config") {
+		return "config"
+	}
+	if strings.Contains(p, "ui") || strings.Contains(p, "frontend") {
+		return "ui"
+	}
+	if strings.Contains(p, "api") || strings.Contains(p, "handler") {
+		return "api-layer"
+	}
+	if strings.Contains(p, "inject") || strings.Contains(p, "container") {
+		return "injector"
+	}
+	return "logic"
+}
+
+func isIgnoreZone(path string) bool {
+	p := strings.ToLower(path)
+	return strings.Contains(p, "_test.go") ||
+		strings.Contains(p, "vendor/") ||
+		strings.Contains(p, "generated/") ||
+		strings.Contains(p, "mock") ||
+		strings.Contains(p, "temp") ||
+		strings.Contains(p, "debug")
+}
+
+func generateExecutionFlows(files []FileMap) []ExecutionFlow {
+	var flows []ExecutionFlow
+
+	// Heuristic: Build major paths
+	// 1. CLI Execution (main -> internals)
+	cliFlow := ExecutionFlow{Name: "CLI Execution"}
+	for _, f := range files {
+		if strings.HasSuffix(f.Path, "main.go") {
+			cliFlow.Steps = append(cliFlow.Steps, "main")
+			for _, call := range f.Calls {
+				cliFlow.Steps = append(cliFlow.Steps, call.To)
+			}
+			break
+		}
+	}
+	if len(cliFlow.Steps) > 1 {
+		flows = append(flows, cliFlow)
+	}
+
+	// 2. Build Map Flow (BuildMap -> parse -> post-process)
+	buildFlow := ExecutionFlow{Name: "Build Map Flow"}
+	for _, f := range files {
+		if strings.Contains(f.Path, "buildMap.go") {
+			buildFlow.Steps = append(buildFlow.Steps, "BuildMap")
+			for _, fn := range f.Functions {
+				if strings.HasPrefix(fn.Name, "parse") || strings.HasPrefix(fn.Name, "calculate") {
+					buildFlow.Steps = append(buildFlow.Steps, fn.Name)
+				}
+			}
+			break
+		}
+	}
+	if len(buildFlow.Steps) > 1 {
+		flows = append(flows, buildFlow)
+	}
+
+	return flows
+}
+
+func isEntryPoint(path string, f *FileMap) bool {
+	p := strings.ToLower(filepath.Base(path))
+
+	// Go
+	if f.Package == "main" || p == "main.go" {
+		return true
+	}
+
+	// JS / TS
+	if strings.HasPrefix(p, "index.") ||
+		strings.HasPrefix(p, "server.") ||
+		strings.HasPrefix(p, "app.") ||
+		strings.HasPrefix(p, "main.") {
+		return true
+	}
+
+	// Python
+	if p == "main.py" || p == "app.py" || p == "server.py" {
+		return true
+	}
+
+	// Java
+	if p == "main.java" || p == "app.java" {
+		return true
+	}
+
+	return false
 }
