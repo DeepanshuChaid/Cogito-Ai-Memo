@@ -6,7 +6,7 @@
     "internals\\adapters\\codex.go": "09e056c002a401e44b22fe05c568b536d1879934d5a391034da932efd3d2c432",
     "internals\\adapters\\cursor.go": "09e056c002a401e44b22fe05c568b536d1879934d5a391034da932efd3d2c432",
     "internals\\adapters\\gemini.go": "09e056c002a401e44b22fe05c568b536d1879934d5a391034da932efd3d2c432",
-    "internals\\commands\\buildMap.go": "282928cb1f0bc5bbf2fbece7e0ffeaaae46c6c0d25100a22045d358d2e689def",
+    "internals\\commands\\buildMap.go": "2fc00b648d5593f607ffddf98a9d46d7323dcb857fb52b69e320990132326021",
     "internals\\commands\\cache.go": "cfdc278bac288cb4880a76faaeb786d890fa21e746772924567d508c762c80b4",
     "internals\\commands\\handleConfig.go": "8b7995719e43b257eac6fe75d3b3912ad8665123a9dbe57821f7a92edcccd210",
     "internals\\commands\\handleHooks.go": "22b55d8756e8c3174626c665022683ff2b4320796bc720a04114669f1504d733",
