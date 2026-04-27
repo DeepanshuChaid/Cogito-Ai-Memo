@@ -194,6 +194,28 @@ func BuildMap() {
 		}
 	}
 
+	sb.WriteString("\n@function_calls\n")
+	allFuncs := make(map[string]bool)
+	for _, f := range allFiles {
+		for _, fn := range f.Functions {
+			allFuncs[fn.Name] = true
+		}
+	}
+
+	seenCalls := make(map[string]bool)
+	for _, f := range allFiles {
+		for _, call := range f.Calls {
+			// Only show project-internal calls to meaningful functions
+			if allFuncs[call.From] && allFuncs[call.To] && !isLowValueCall(call.To) {
+				key := call.From + ">" + call.To
+				if !seenCalls[key] {
+					sb.WriteString(key + "\n")
+					seenCalls[key] = true
+				}
+			}
+		}
+	}
+
 	os.MkdirAll(".cogito", os.ModePerm)
 	os.WriteFile(".cogito/substrate.txt", []byte(sb.String()), 0644)
 	fmt.Println("CRG Substrate v4.0 successfully created at .cogito/substrate.txt")
@@ -472,6 +494,7 @@ func parseGoFile(path string) FileMap {
 
 var pyFuncRegex = regexp.MustCompile(`^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(`)
 var pyClassRegex = regexp.MustCompile(`^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)\b`)
+var callRegex = regexp.MustCompile(`([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`)
 
 func parsePythonFile(path string) FileMap {
 	fmt.Println("Parsing file:", path)
@@ -479,6 +502,7 @@ func parsePythonFile(path string) FileMap {
 	text := string(content)
 	fileMap := FileMap{Path: path, Language: "python"}
 	lines := strings.Split(text, "\n")
+	curFunc := ""
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") { continue }
@@ -498,6 +522,7 @@ func parsePythonFile(path string) FileMap {
 		// Function detection
 		if match := pyFuncRegex.FindStringSubmatch(line); match != nil {
 			name := match[1]
+			curFunc = name
 			isAsync := strings.Contains(trimmed, "async ")
 			isPublic := !strings.HasPrefix(name, "_") || (strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__"))
 			fileMap.Functions = append(fileMap.Functions, Function{
@@ -505,9 +530,21 @@ func parsePythonFile(path string) FileMap {
 			})
 		}
 
+		// Call detection
+		if curFunc != "" && !strings.Contains(line, "def ") {
+			matches := callRegex.FindAllStringSubmatch(line, -1)
+			for _, m := range matches {
+				callee := m[1]
+				if callee != curFunc && !isLowValueCall(callee) {
+					fileMap.Calls = append(fileMap.Calls, CallRelation{From: curFunc, To: callee})
+				}
+			}
+		}
+
 		// Class detection
 		if match := pyClassRegex.FindStringSubmatch(line); match != nil {
 			fileMap.Classes = append(fileMap.Classes, match[1])
+			curFunc = "" // Reset context on class start
 		}
 	}
 	return fileMap
@@ -531,6 +568,7 @@ func parseJSFile(path string) FileMap {
 	if ext == ".ts" || ext == ".tsx" { fileMap.Language = "typescript" }
 	
 	lines := strings.Split(text, "\n")
+	curFunc := ""
 	for i, line := range lines {
 		lineStr := line
 		line = strings.TrimSpace(line)
@@ -553,9 +591,21 @@ func parseJSFile(path string) FileMap {
 		}
 
 		if name != "" && !isJSKeyword(name) {
+			curFunc = name
 			fileMap.Functions = append(fileMap.Functions, Function{
 				Name: name, Line: i + 1, IsAsync: isAsync, IsExported: isExported,
 			})
+		}
+
+		// Call detection
+		if curFunc != "" && !strings.Contains(line, "function") && !strings.Contains(line, "=>") {
+			matches := callRegex.FindAllStringSubmatch(lineStr, -1)
+			for _, m := range matches {
+				callee := m[1]
+				if callee != curFunc && !isJSKeyword(callee) && !isLowValueCall(callee) {
+					fileMap.Calls = append(fileMap.Calls, CallRelation{From: curFunc, To: callee})
+				}
+			}
 		}
 
 		// Class detection 
@@ -566,6 +616,7 @@ func parseJSFile(path string) FileMap {
 				cname = strings.Trim(cname, "{")
 				if cname != "" {
 					fileMap.Classes = append(fileMap.Classes, cname)
+					curFunc = ""
 				}
 			}
 		}
@@ -593,6 +644,7 @@ func parseJavaFile(path string) FileMap {
 	text := string(content)
 	fileMap := FileMap{Path: path, Language: "java"}
 	lines := strings.Split(text, "\n")
+	curFunc := ""
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "//") { continue }
@@ -609,14 +661,16 @@ func parseJavaFile(path string) FileMap {
 		}
 
 		// Class / interface detection
-		if strings.Contains(trimmed, "{") {
+		if strings.Contains(trimmed, "{") && (strings.Contains(trimmed, "class ") || strings.Contains(trimmed, "interface ")) {
 			parts := strings.Fields(trimmed)
 			for j, p := range parts {
 				if p == "class" && j+1 < len(parts) {
 					fileMap.Classes = append(fileMap.Classes, strings.Trim(parts[j+1], "{"))
+					curFunc = ""
 				}
 				if p == "interface" && j+1 < len(parts) {
 					fileMap.Interfaces = append(fileMap.Interfaces, strings.Trim(parts[j+1], "{"))
+					curFunc = ""
 				}
 			}
 		}
@@ -626,6 +680,7 @@ func parseJavaFile(path string) FileMap {
 			if match := javaMethodRegex.FindStringSubmatch(line); match != nil && match[1] != "" {
 				name := match[1]
 				if !isJavaKeyword(name) {
+					curFunc = name
 					isPublic := strings.Contains(trimmed, "public ") || (!strings.Contains(trimmed, "private ") && !strings.Contains(trimmed, "protected "))
 					isAsync := strings.Contains(trimmed, "CompletableFuture") || strings.Contains(trimmed, "Mono<") || strings.Contains(trimmed, "Flux<") || strings.Contains(trimmed, "@Async")
 					if isPublic {
@@ -634,6 +689,17 @@ func parseJavaFile(path string) FileMap {
 					fileMap.Functions = append(fileMap.Functions, Function{
 						Name: name, Line: i + 1, IsAsync: isAsync, IsExported: isPublic,
 					})
+				}
+			}
+		}
+
+		// Call detection
+		if curFunc != "" {
+			matches := callRegex.FindAllStringSubmatch(line, -1)
+			for _, m := range matches {
+				callee := m[1]
+				if callee != curFunc && !isJavaKeyword(callee) && !isLowValueCall(callee) {
+					fileMap.Calls = append(fileMap.Calls, CallRelation{From: curFunc, To: callee})
 				}
 			}
 		}
@@ -708,7 +774,14 @@ func isHighSignalFunc(name string) bool {
 }
 
 func isLowValueCall(name string) bool {
-	low := map[string]bool{"len": true, "append": true, "make": true, "new": true, "Println": true, "Printf": true}
+	low := map[string]bool{
+		"len": true, "append": true, "make": true, "new": true,
+		"Println": true, "Printf": true, "Split": true, "Join": true,
+		"TrimSpace": true, "ToLower": true, "ToUpper": true,
+		"Contains": true, "HasPrefix": true, "HasSuffix": true,
+		"Error": true, "Errorf": true, "Panic": true, "Fatal": true,
+		"String": true, "Close": true, "Read": true, "Write": true,
+	}
 	return low[name]
 }
 
