@@ -243,16 +243,16 @@ func findFile(files []FileMap, path string) *FileMap {
 func extractKeyFunctions(f *FileMap) []string {
 	var keys []string
 	if f == nil { return keys }
-	
+
 	base := strings.TrimSuffix(filepath.Base(f.Path), filepath.Ext(f.Path))
-	
+
 	for _, fn := range f.Functions {
 		// Priority 1: File Ownership (e.g. detect.py -> detect())
 		if fn.Name == base {
 			keys = append(keys, fn.Name)
 			continue
 		}
-		
+
 		// Priority 2: High Signal Filtering
 		if isHighSignalFunc(fn.Name) {
 			keys = append(keys, fn.Name)
@@ -299,7 +299,7 @@ func scoreFile(f FileMap) int {
 		} else if f.Language == "go" && len(fn.Name) > 0 && fn.Name[0] >= 'A' && fn.Name[0] <= 'Z' {
 			exportedCount++
 		}
-		
+
 		if strings.HasPrefix(fn.Name, "New") || fn.Name == "constructor" {
 			constructorCount++
 		}
@@ -307,7 +307,7 @@ func scoreFile(f FileMap) int {
 			asyncCount++
 		}
 	}
-	
+
 	score += exportedCount * 4
 	score += len(f.Interfaces) * 10
 	score += len(f.Structs) * 5
@@ -578,7 +578,7 @@ func parseJSFile(path string) FileMap {
 	ext := strings.ToLower(filepath.Ext(path))
 	fileMap := FileMap{Path: path, Language: "javascript"}
 	if ext == ".ts" || ext == ".tsx" { fileMap.Language = "typescript" }
-	
+
 	lines := strings.Split(text, "\n")
 	curFunc := ""
 	for i, line := range lines {
@@ -620,7 +620,7 @@ func parseJSFile(path string) FileMap {
 			}
 		}
 
-		// Class detection 
+		// Class detection
 		if strings.Contains(line, "class ") {
 			parts := strings.Split(line, "class ")
 			if len(parts) > 1 {
@@ -632,7 +632,7 @@ func parseJSFile(path string) FileMap {
 				}
 			}
 		}
-		
+
 		// React detection heuristic
 		if (ext == ".tsx" || ext == ".jsx") && (strings.Contains(line, "return (") || strings.Contains(line, "=> (")) {
 			if !strings.Contains(fileMap.Summary, "React Component") {
@@ -740,14 +740,14 @@ func isEntryPoint(path string, f *FileMap) bool {
 
 func isHighSignalFunc(name string) bool {
 	if len(name) == 0 { return false }
-	
+
 	// Universal Noise
 	noise := map[string]bool{
 		"String": true, "Error": true, "Len": true, "temp": true, "helper": true,
 		"test": true, "random": true, "wrapper": true, "callback": true,
 	}
 	if noise[name] { return false }
-	
+
 	low := strings.ToLower(name)
 	if strings.Contains(low, "temp") || strings.Contains(low, "helper") || strings.Contains(low, "test") {
 		return false

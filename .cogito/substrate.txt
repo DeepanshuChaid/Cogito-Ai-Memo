@@ -63,42 +63,42 @@
 28 e30
 
 @edges
-0>19:1c
-3>4:3c
-5>13:5r
-6>15:2c
-6>18:1c
-6>19:1c
-0>10:1c
-22>13:1r
-23>26:9c
-0>8:1c
-0>17:1c
-8>21:1c
-0>3:1c
-0>7:1c
-0>24:1c
-3>11:1c
-3>2:1c
-6>17:1c
-6>13:1r
-16>15:1c
 0>5:1r
+3>11:1c
+6>17:1c
 24>23:1c
+0>7:1c
 0>9:1c
 0>12:1c
-0>22:2c
-0>13:1r
+6>19:1c
 23>17:1c
 0>14:2c
+0>3:1c
+0>24:1c
+0>10:1c
+3>2:1c
+5>13:5r
+6>18:1c
+0>8:1c
+0>17:1c
+0>13:1r
+6>13:1r
+8>21:1c
+22>13:1r
+0>22:2c
+0>19:1c
+3>4:3c
+16>15:1c
 0>6:1c
+6>15:2c
+23>26:9c
 
 @why
 
 @flows
-CLI: 0>22>13
 MCP: 23>26
 MCP: 24>23>26
+CLI: 0>22>13
 
 @function_calls
 main>InitDB,Install,BuildMap,HandleConfig,Help,Uninstall,Version,HandleHooks,ServeMcp,InitializeProjectSession,Unknown,ShowWelcomeUI,printSessions,printObservations,printSummaries

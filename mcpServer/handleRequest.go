@@ -2,9 +2,10 @@ package mcpServer
 
 import (
 	"os"
-	"path/filepath"
-	"strings"
+	// "path/filepath"
+	// "strings"
 
+	// "github.com/DeepanshuChaid/Cogito-Ai.git/internals/commands"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/db"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/models/schemaModels"
 )
@@ -18,8 +19,6 @@ Terse like caveman. Technical substance exact.
 No fluff. No filler. No pleasantries.
 Fragments OK. Short sentences.
 ALWAYS ACTIVE.
-
-Use get_codebase_map to understand project structure. When asked to Fix anything or just asked anything related to codebase, use it. It is your best friend. It is your only friend.
 `
 
 func handleRequest(req JSONRPCRequest) interface{} {
@@ -37,6 +36,14 @@ func handleRequest(req JSONRPCRequest) interface{} {
 			currentSession = session
 		}
 
+		// go func() {
+		// 	commands.BuildMap()
+		// }()
+
+		// go commands.BuildMap()
+
+		injectionPrompt := CAVEMAN_CORE
+
 		return map[string]interface{}{
 			"protocolVersion": "2025-06-18",
 			"capabilities": map[string]interface{}{
@@ -53,7 +60,7 @@ func handleRequest(req JSONRPCRequest) interface{} {
 			},
 
 			// 🔥 SYSTEM-LEVEL INJECTION
-			"instructions": CAVEMAN_CORE,
+			"instructions": injectionPrompt,
 		}
 
 	//==============================================
@@ -79,7 +86,7 @@ func handleRequest(req JSONRPCRequest) interface{} {
 				},
 				{
 					"name":        "get_codebase_map",
-					"description": "List non-hidden files in the current project",
+					"description": "Get A full Map of the Codebase with Details like importance and functions flow.",
 					"inputSchema": map[string]interface{}{
 						"type":       "object",
 						"properties": map[string]interface{}{},
@@ -157,24 +164,8 @@ func handleRequest(req JSONRPCRequest) interface{} {
 		}
 
 		if name == "get_codebase_map" {
-			root := "."
-			if currentSession != nil {
-				root = currentSession.Project
-			}
-
-			output := ""
-			filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return nil
-				}
-				if info == nil {
-					return nil
-				}
-				if !info.IsDir() && !strings.HasPrefix(filepath.Base(path), ".") {
-					output += path + "\n"
-				}
-				return nil
-			})
+			data, _ := os.ReadFile(".cogito/substrate.txt")
+			output := string(data)
 
 			return map[string]interface{}{
 				"content": []map[string]interface{}{

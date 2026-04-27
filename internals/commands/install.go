@@ -23,7 +23,9 @@ func Install() {
 	// ✅ STRONG CONTROL: AGENTS.md (THIS is what actually enforces behavior)
 	rootAgentsPath := filepath.Join(cwd, "AGENTS.md")
 
-	agentsContent := `ALWAYS use caveman mode immediately.
+	agentsContent := `ALWAYS USE THE get_codebase_map TOOL WHENEVER ASKED ABOUT THE CODEBASE I REPEAT YOU MUST USE THIS TOOL THIS WILL HELP YOU TO UNDERSTAND THE CODEBASE AND HELP YOU WRITE A BETTER RESPONSE YOU MUST USE IT
+
+ALWAYS use caveman mode immediately.
 
 Do not announce loading skills.
 Do not explain that you are switching modes.
