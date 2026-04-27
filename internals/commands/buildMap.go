@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -208,7 +209,17 @@ func findFile(files []FileMap, path string) *FileMap {
 func extractKeyFunctions(f *FileMap) []string {
 	var keys []string
 	if f == nil { return keys }
+	
+	base := strings.TrimSuffix(filepath.Base(f.Path), filepath.Ext(f.Path))
+	
 	for _, fn := range f.Functions {
+		// Priority 1: File Ownership (e.g. detect.py -> detect())
+		if fn.Name == base {
+			keys = append(keys, fn.Name)
+			continue
+		}
+		
+		// Priority 2: High Signal Filtering
 		if isHighSignalFunc(fn.Name) {
 			keys = append(keys, fn.Name)
 		}
@@ -418,13 +429,12 @@ func parseGoFile(path string) FileMap {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
 			funcName := d.Name.Name
-			if d.Recv == nil {
-				function := Function{
-					Name: funcName,
-					Line: fset.Position(d.Pos()).Line,
-				}
-				fileMap.Functions = append(fileMap.Functions, function)
+			function := Function{
+				Name:       funcName,
+				Line:       fset.Position(d.Pos()).Line,
+				IsExported: d.Name.IsExported(),
 			}
+			fileMap.Functions = append(fileMap.Functions, function)
 			if d.Body != nil {
 				ast.Inspect(d.Body, func(n ast.Node) bool {
 					call, ok := n.(*ast.CallExpr)
@@ -460,6 +470,9 @@ func parseGoFile(path string) FileMap {
 	return fileMap
 }
 
+var pyFuncRegex = regexp.MustCompile(`^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(`)
+var pyClassRegex = regexp.MustCompile(`^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)\b`)
+
 func parsePythonFile(path string) FileMap {
 	fmt.Println("Parsing file:", path)
 	content, _ := os.ReadFile(path)
@@ -483,30 +496,30 @@ func parsePythonFile(path string) FileMap {
 		}
 
 		// Function detection
-		if strings.HasPrefix(trimmed, "def ") || strings.HasPrefix(trimmed, "async def ") {
-			isAsync := strings.HasPrefix(trimmed, "async ")
-			t := strings.TrimPrefix(trimmed, "async ")
-			t = strings.TrimPrefix(t, "def ")
-			name := strings.TrimSpace(strings.Split(t, "(")[0])
-			if name != "" {
-				isPublic := !strings.HasPrefix(name, "_")
-				fileMap.Functions = append(fileMap.Functions, Function{
-					Name: name, IsAsync: isAsync, IsExported: isPublic,
-				})
-			}
+		if match := pyFuncRegex.FindStringSubmatch(line); match != nil {
+			name := match[1]
+			isAsync := strings.Contains(trimmed, "async ")
+			isPublic := !strings.HasPrefix(name, "_") || (strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__"))
+			fileMap.Functions = append(fileMap.Functions, Function{
+				Name: name, IsAsync: isAsync, IsExported: isPublic,
+			})
 		}
 
 		// Class detection
-		if strings.HasPrefix(trimmed, "class ") {
-			name := strings.TrimPrefix(trimmed, "class ")
-			name = strings.Split(name, "(")[0]
-			name = strings.Split(name, ":")[0]
-			if name = strings.TrimSpace(name); name != "" {
-				fileMap.Classes = append(fileMap.Classes, name)
-			}
+		if match := pyClassRegex.FindStringSubmatch(line); match != nil {
+			fileMap.Classes = append(fileMap.Classes, match[1])
 		}
 	}
 	return fileMap
+}
+
+var jsFuncRegexDecl = regexp.MustCompile(`(?:^|\s)(?:export\s+)?(?:default\s+)?(?:async\s+)?function(?:\s*\*\s*|\s+)([a-zA-Z_$][a-zA-Z0-9_$]*)?\s*\(`)
+var jsFuncRegexExpr = regexp.MustCompile(`(?:^|\s)(?:export\s+)?(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s+)?(?:function\s*(?:\*)?\s*(?:[a-zA-Z_$][a-zA-Z0-9_$]*)?\s*\(|\([^)]*\)\s*=>|[a-zA-Z_$][a-zA-Z0-9_$]*\s*=>)`)
+var jsMethodRegex = regexp.MustCompile(`^\s*(?:async\s+)?(?:get\s+|set\s+|static\s+)?\*?\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*(?::\s*[^\{]+)?\s*\{`)
+
+func isJSKeyword(name string) bool {
+	kw := map[string]bool{"if": true, "for": true, "while": true, "switch": true, "catch": true, "constructor": true, "function": true, "return": true, "await": true, "yield": true}
+	return kw[name]
 }
 
 func parseJSFile(path string) FileMap {
@@ -519,6 +532,7 @@ func parseJSFile(path string) FileMap {
 	
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
+		lineStr := line
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "/*") { continue }
 
@@ -526,35 +540,33 @@ func parseJSFile(path string) FileMap {
 		isAsync := strings.Contains(line, "async ")
 
 		// Function detection
-		if strings.Contains(line, "function") || strings.Contains(line, "=>") {
-			name := ""
-			if strings.Contains(line, "function") {
-				parts := strings.Split(line, "function")
-				if len(parts) > 1 {
-					name = strings.TrimSpace(strings.Split(parts[1], "(")[0])
-				}
+		name := ""
+		if match := jsFuncRegexDecl.FindStringSubmatch(lineStr); match != nil {
+			name = match[1]
+			if name == "" && strings.Contains(line, "export default") {
+				name = "default"
 			}
-			if name == "" && strings.Contains(line, "=") { // Arrow function
-				name = strings.TrimSpace(strings.Split(line, "=")[0])
-				name = strings.TrimPrefix(name, "const ")
-				name = strings.TrimPrefix(name, "let ")
-				name = strings.TrimPrefix(name, "var ")
-				name = strings.TrimPrefix(name, "export ")
-			}
+		} else if match := jsFuncRegexExpr.FindStringSubmatch(lineStr); match != nil && match[1] != "" {
+			name = match[1]
+		} else if match := jsMethodRegex.FindStringSubmatch(lineStr); match != nil && match[1] != "" {
+			name = match[1]
+		}
 
-			if name != "" && !strings.Contains(name, " ") {
-				fileMap.Functions = append(fileMap.Functions, Function{
-					Name: name, Line: i + 1, IsAsync: isAsync, IsExported: isExported,
-				})
-			}
+		if name != "" && !isJSKeyword(name) {
+			fileMap.Functions = append(fileMap.Functions, Function{
+				Name: name, Line: i + 1, IsAsync: isAsync, IsExported: isExported,
+			})
 		}
 
 		// Class detection 
 		if strings.Contains(line, "class ") {
-			name := strings.TrimSpace(strings.Split(strings.Split(line, "class ")[1], " ")[0])
-			name = strings.Trim(name, "{")
-			if name != "" {
-				fileMap.Classes = append(fileMap.Classes, name)
+			parts := strings.Split(line, "class ")
+			if len(parts) > 1 {
+				cname := strings.TrimSpace(strings.Split(parts[1], " ")[0])
+				cname = strings.Trim(cname, "{")
+				if cname != "" {
+					fileMap.Classes = append(fileMap.Classes, cname)
+				}
 			}
 		}
 		
@@ -566,6 +578,13 @@ func parseJSFile(path string) FileMap {
 		}
 	}
 	return fileMap
+}
+
+var javaMethodRegex = regexp.MustCompile(`^\s*(?:(?:public|private|protected|static|final|native|synchronized|abstract|default)\s+)*\s*(?:[\w<>\[\]\?]+\s+)*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`)
+
+func isJavaKeyword(name string) bool {
+	kw := map[string]bool{"if": true, "for": true, "while": true, "switch": true, "catch": true, "synchronized": true, "return": true, "new": true, "super": true, "this": true}
+	return kw[name]
 }
 
 func parseJavaFile(path string) FileMap {
@@ -602,21 +621,19 @@ func parseJavaFile(path string) FileMap {
 			}
 		}
 
-		// Public method detection (public <type> <name>()
-		if strings.Contains(trimmed, "public ") && strings.Contains(trimmed, "(") && !strings.Contains(trimmed, "class ") {
-			fileMap.PublicMethods++
-			isAsync := strings.Contains(trimmed, "CompletableFuture") || strings.Contains(trimmed, "Mono<") || strings.Contains(trimmed, "Flux<")
-			parts := strings.Fields(trimmed)
-			// name is usually the token before "("
-			for _, tok := range parts {
-				if strings.Contains(tok, "(") {
-					name := strings.Split(tok, "(")[0]
-					if name != "" {
-						fileMap.Functions = append(fileMap.Functions, Function{
-							Name: name, Line: i + 1, IsAsync: isAsync, IsExported: true,
-						})
+		// Method detection
+		if !strings.Contains(trimmed, "class ") && !strings.Contains(trimmed, "interface ") && !strings.Contains(trimmed, "new ") {
+			if match := javaMethodRegex.FindStringSubmatch(line); match != nil && match[1] != "" {
+				name := match[1]
+				if !isJavaKeyword(name) {
+					isPublic := strings.Contains(trimmed, "public ") || (!strings.Contains(trimmed, "private ") && !strings.Contains(trimmed, "protected "))
+					isAsync := strings.Contains(trimmed, "CompletableFuture") || strings.Contains(trimmed, "Mono<") || strings.Contains(trimmed, "Flux<") || strings.Contains(trimmed, "@Async")
+					if isPublic {
+						fileMap.PublicMethods++
 					}
-					break
+					fileMap.Functions = append(fileMap.Functions, Function{
+						Name: name, Line: i + 1, IsAsync: isAsync, IsExported: isPublic,
+					})
 				}
 			}
 		}
@@ -644,9 +661,50 @@ func isEntryPoint(path string, f *FileMap) bool {
 }
 
 func isHighSignalFunc(name string) bool {
-	if len(name) == 0 || name[0] < 'A' || name[0] > 'Z' { return false }
-	noise := map[string]bool{"String": true, "Error": true, "Len": true}
-	return !noise[name]
+	if len(name) == 0 { return false }
+	
+	// Universal Noise
+	noise := map[string]bool{
+		"String": true, "Error": true, "Len": true, "temp": true, "helper": true,
+		"test": true, "random": true, "wrapper": true, "callback": true,
+	}
+	if noise[name] { return false }
+	
+	low := strings.ToLower(name)
+	if strings.Contains(low, "temp") || strings.Contains(low, "helper") || strings.Contains(low, "test") {
+		return false
+	}
+
+	// 1. Exported Naming (Go-style)
+	if name[0] >= 'A' && name[0] <= 'Z' {
+		return true
+	}
+
+	// 2. Significant Internal/Architectural patterns (Python/JS/Java)
+	// Allow meaningful underscore-prefixed if they aren't noise
+	trimmed := strings.TrimPrefix(name, "_")
+	if len(trimmed) == 0 { return false }
+
+	prefixes := []string{
+		"get", "set", "create", "update", "build", "handle", "start", "stop",
+		"serve", "process", "load", "save", "init", "initialize", "run", "watch",
+		"inject", "complete", "mark", "classify", "count", "convert", "extract",
+		"detect", "parse", "is", "has", "should", "validate", "check",
+	}
+
+	lowTrimmed := strings.ToLower(trimmed)
+	for _, p := range prefixes {
+		if strings.HasPrefix(lowTrimmed, p) {
+			return true
+		}
+	}
+
+	// 3. Snake_case heuristic for architectural functions
+	if strings.Contains(name, "_") && len(name) > 8 {
+		return true
+	}
+
+	return false
 }
 
 func isLowValueCall(name string) bool {
