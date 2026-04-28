@@ -6,6 +6,7 @@ import (
 	// "strings"
 
 	// "github.com/DeepanshuChaid/Cogito-Ai.git/internals/commands"
+	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/commands"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/db"
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/models/schemaModels"
 )
@@ -164,6 +165,8 @@ func handleRequest(req JSONRPCRequest) interface{} {
 		}
 
 		if name == "get_codebase_map" {
+			commands.BuildMap(false)
+
 			data, _ := os.ReadFile(".cogito/substrate.txt")
 			output := string(data)
 

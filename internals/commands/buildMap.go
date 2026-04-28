@@ -11,15 +11,21 @@ import (
 	"strings"
 )
 
+var SHOULD_PRINT bool
+
 // Schema v4.0 - CRG Substrate (LLM Reasoning Surface)
 
-func BuildMap() {
+func BuildMap(shouldPrint bool) {
 	root := "."
 	_ = LoadCache()
 	newCache := Cache{Files: make(map[string]string)}
 	var allFiles []FileMap
 
-	fmt.Println("Building CRG Substrate v4.0...")
+	SHOULD_PRINT = shouldPrint
+
+	if shouldPrint {
+		fmt.Println("Building CRG Substrate v4.0...")
+	}
 
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info == nil { return nil }
@@ -228,7 +234,9 @@ func BuildMap() {
 
 	os.MkdirAll(".cogito", os.ModePerm)
 	os.WriteFile(".cogito/substrate.txt", []byte(sb.String()), 0644)
-	fmt.Println("CRG Substrate v4.0 successfully created at .cogito/substrate.txt")
+	if SHOULD_PRINT {
+		fmt.Println("CRG Substrate v4.0 successfully created at .cogito/substrate.txt")
+	}
 }
 
 
@@ -450,7 +458,10 @@ func parseFile(path string) FileMap {
 
 func parseGoFile(path string) FileMap {
 	fset := token.NewFileSet()
-	fmt.Println("Parsing file:", path)
+	if SHOULD_PRINT {
+		fmt.Println("Parsing file:", path)
+	}
+
 	node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
 		return FileMap{Path: path}
@@ -509,7 +520,10 @@ var pyClassRegex = regexp.MustCompile(`^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)\b`)
 var callRegex = regexp.MustCompile(`([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(`)
 
 func parsePythonFile(path string) FileMap {
-	fmt.Println("Parsing file:", path)
+	if SHOULD_PRINT {
+		fmt.Println("Parsing file:", path)
+	}
+
 	content, _ := os.ReadFile(path)
 	text := string(content)
 	fileMap := FileMap{Path: path, Language: "python"}
@@ -572,7 +586,10 @@ func isJSKeyword(name string) bool {
 }
 
 func parseJSFile(path string) FileMap {
-	fmt.Println("Parsing file:", path)
+	if SHOULD_PRINT {
+		fmt.Println("Parsing file:", path)
+	}
+
 	content, _ := os.ReadFile(path)
 	text := string(content)
 	ext := strings.ToLower(filepath.Ext(path))
@@ -651,7 +668,10 @@ func isJavaKeyword(name string) bool {
 }
 
 func parseJavaFile(path string) FileMap {
-	fmt.Println("Parsing file:", path)
+	if SHOULD_PRINT {
+		fmt.Println("Parsing file:", path)
+	}
+
 	content, _ := os.ReadFile(path)
 	text := string(content)
 	fileMap := FileMap{Path: path, Language: "java"}

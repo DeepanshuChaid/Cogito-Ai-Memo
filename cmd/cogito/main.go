@@ -32,7 +32,7 @@ func main() {
 			return
 
 		case "build-map":
-			commands.BuildMap()
+			commands.BuildMap(true)
 			return
 
 		case "config":
