@@ -2,15 +2,25 @@ package commands
 
 import "fmt"
 
-// commands/help.go
 func Help() {
-    fmt.Println(`Commands:
-  cogito install          Install hooks
-  cogito uninstall        Remove hooks
-  cogito config get <key> Get config value
-  cogito config set <key> <value>  Set config value
-  cogito config list      Show all config
-  cogito config reset     Reset to defaults
-  cogito --help           Show this help
-  cogito --version        Show version`)
+	fmt.Println(`Usage:
+  cogito <command>
+
+Core Commands:
+  install        Install and configure Cogito
+  uninstall      Remove Cogito and cleanup
+  build-map      Generate full codebase substrate map
+
+Info:
+  --help         Show help information
+  --version, -v  Show current version
+
+Internal / MCP:
+  serve-mcp      Start MCP stdio server for Codex/Claude
+
+Notes:
+  • serve-mcp is internal and should not be run manually
+  • install registers the MCP server in ~/.codex/config.toml
+  • uninstall removes only Cogito-owned MCP config + local project data
+`)
 }
