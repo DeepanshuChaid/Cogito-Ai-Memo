@@ -1,6 +1,6 @@
 {
   "files": {
-    "cmd\\cogito\\main.go": "94e6d91a923e595576b45ad69d4573d52e0578d9aec573a2af5b7c244f872fbc",
+    "cmd\\cogito\\main.go": "a51ba2ed34a06b2bebf723d61ab30c9917bb28cc9b165c1f777ec58ee65ca500",
     "internals\\adapters\\adapter.go": "28875022ec148bc174ac354060ec3f954f393d4a50de1c0a2586c55ad393b33c",
     "internals\\adapters\\claude.go": "9006d4af76b7b497e9bb403ac438978dd7839f57eb20ac9ffcaaad8762dc4e2d",
     "internals\\adapters\\codex.go": "09e056c002a401e44b22fe05c568b536d1879934d5a391034da932efd3d2c432",
@@ -11,8 +11,8 @@
     "internals\\commands\\handleConfig.go": "8b7995719e43b257eac6fe75d3b3912ad8665123a9dbe57821f7a92edcccd210",
     "internals\\commands\\handleHooks.go": "22b55d8756e8c3174626c665022683ff2b4320796bc720a04114669f1504d733",
     "internals\\commands\\help.go": "93d5051dcfc6f195dddd1cdf28794a32ef3bff5bb85502474b421bdd94316524",
-    "internals\\commands\\install.go": "677ef6dbeca64c9073691811fb0fd9084629f01525c8261f325aea80d7809df5",
-    "internals\\commands\\uninstall.go": "6c197f25358b515da2603b1c4db4c85486f73af2102ed50a0793c38237ffb652",
+    "internals\\commands\\install.go": "85d662450ee967db1a3398df53056a273d205236efd496dff7d6aaba737deb00",
+    "internals\\commands\\uninstall.go": "4e8663b6135c0cb10772e197202f6fd5890ac3c143fdccb17b1d85e9e7adcf56",
     "internals\\commands\\unkown.go": "d05eba960b91fa6a3f18b441ee20e6a0bba907d33a71c8552617042023d678ad",
     "internals\\commands\\utils.go": "f3393fee71dc44252e94fc788f53049f4c29f375966aaa44fd6de0abdac933b6",
     "internals\\commands\\version.go": "28b874920a86c996865d00dd00d06a6295b5da626bf45db0a17e06035737d48f",
@@ -28,12 +28,12 @@
     "internals\\injector\\injector.go": "df86ba2ea356603fd7721c54625f9cb85accb8068276f139c133ba861931d189",
     "internals\\models\\schemaModels\\schemaModels.go": "1d1830c1204e273af8028b5668e12248d1d3d3d3c4faf82234342c100205450c",
     "internals\\utils\\skills\\skills.go": "31c57aba71fb88ab2018cd5546740b12f26fdb40e7496aa42e4973f9b845537e",
-    "internals\\utils\\welcomeUi\\welcomeUi.go": "43973e3ae9138a5a92150f976691a6770f25eea8881303171ad332196a54639f",
+    "internals\\utils\\welcomeUi\\welcomeUi.go": "f7ed141157390ea9ae0aa5ca69547c84a21ac909371dca57c4c7b91fa9034529",
     "mcpServer\\handleRequest.go": "d38c5fa384b816251b0869235bb8d3f6a057b3f02ec1a738f3ae9b2fac6cebd0",
-    "mcpServer\\mcpServer.go": "7b75a061cfeaa56300705c3b9847dbd7a43cee8698776ec3a591b6796c79d302",
+    "mcpServer\\mcpServer.go": "7a6b412bf21799d02fd9f63dc79877a1682fb18087e45fd2a2b5067a14023bbe",
     "mcpServer\\types.go": "9e112bc36d6a4e04d71c29e1689f6fd07fbcf24c63130dbd0ef87bcdf2291e42",
     "mcpServer\\utils.go": "4c7493412a689234edc68a8935bc57788cdbe70eed215d5e32825342d8a5f3c8",
     "pkg\\types\\types.go": "06e21117debe985a3b206bad122f3ce0024faa96ee99d23a141fee353dbef676",
-    "test.go": "0ab67bd27f737a0e5ce0021b8725dcb1c98b6483979eb296d0797f57373d0864"
+    "test.go": "54dcea5f3487a4fd7ef569064212f6447fc9381c1a8afdc077227a6b7c61ee22"
   }
 }

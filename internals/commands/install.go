@@ -219,30 +219,3 @@ func upsertCodexMCPServer(homeDir string) error {
 
 	return os.WriteFile(configPath, []byte(finalContent), 0644)
 }
-
-func stripCogitoMCPBlock(content string) string {
-	lines := strings.Split(content, "\n")
-	var result []string
-	skipping := false
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-
-		// If we find our section, start skipping lines
-		if trimmed == "[mcp_servers.cogito]" {
-			skipping = true
-			continue
-		}
-
-		// If we hit a NEW section (starts with [), stop skipping
-		if skipping && strings.HasPrefix(trimmed, "[") {
-			skipping = false
-		}
-
-		if !skipping {
-			result = append(result, line)
-		}
-	}
-	return strings.Join(result, "\n")
-}
-

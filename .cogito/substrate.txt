@@ -32,29 +32,29 @@
 28:test.go
 
 @nodes
-0 e74 !main,HandleHook
+0 e70 !main
 1 a34 !GetAdapter
 2 a76 !Name,ParseInput,FormatOutput,GetHookEvent
 3 c82 !BuildMap,extractKeyFunctions,isSupported,classifyTags,parseFile,parseGoFile,parsePythonFile,isJSKeyword,parseJSFile,isJavaKeyword,parseJavaFile,isEntryPoint,isHighSignalFunc,isLowValueCall
 4 s99 !LoadCache,SaveCache,GetFileHash
-5 s63 !HandleConfig,handleGet,handleSet,handleList
-6 u43 !HandleHooks,handleSessionStart,handleToolUse,handleSessionEnd,shouldSaveObservation,extractFiles,getActionSummary
+5 s44 !HandleConfig,handleGet,handleSet,handleList
+6 u24 !HandleHooks,handleSessionStart,handleToolUse,handleSessionEnd,shouldSaveObservation,extractFiles,getActionSummary
 7 u43 !Help
 8 u28 !Install
-9 u43 !Uninstall
+9 u51 !Uninstall
 10 u43 !Unknown
 11 u39 !ShouldSkipDir
 12 u43 !Version
 13 s99 !GetConfigPath,GetConfigPathForDir,Load,LoadForDir,Save,IsValid
-14 p86 !InitDB,GetAllMemories
+14 p67 !InitDB,GetAllMemories
 15 p99 !Set,Get,Append,CreateObservation,GetRecentObservations,GetObservationTeasers,FastSearch,SearchObservationsFTS
 16 p60 !GetProjectBySession,StartPendingWorker,CreatePendingObservation,GetUnprocessedObservations,MarkObservationProcessed
 17 p99 !InitializeProjectSession,UpdateMemorySessionID,CompleteSession
-18 p58 !CreateSessionSummary
-19 u53 !BuildFinalPrompt
+18 p57 !CreateSessionSummary
+19 u33 !BuildFinalPrompt
 20 p55
 21 u32 !CreateSkills
-22 u62 !ShowWelcomeUI
+22 u43 !ShowWelcomeUI
 23 e99 !handleRequest
 24 e93 !ServeMcp
 25 o30
@@ -63,47 +63,42 @@
 28 e30
 
 @edges
-0>3:1c
-0>22:2c
-6>13:1r
-0>14:2c
-0>24:1c
-5>13:5r
-6>18:1c
-6>17:1c
-24>23:1c
+23>3:1c
+24>17:1c
+0>14:1c
 0>7:1c
 0>9:1c
-0>12:1c
-0>17:1c
-3>4:3c
-6>15:2c
-16>15:1c
-22>13:1r
-0>13:1r
-3>11:1c
-23>26:9c
-0>19:1c
-23>17:1c
-0>8:1c
-0>6:1c
-0>10:1c
-0>5:1r
-8>21:1c
-23>3:1c
-3>2:1c
+0>22:1c
 6>19:1c
+0>12:1c
+0>24:1c
+3>4:3c
+3>11:1c
+3>2:1c
+6>18:1c
+6>17:1c
+16>15:1c
+0>10:1c
+5>13:5r
+8>9:1c
+23>26:9c
+23>17:1c
+24>23:1c
+0>8:1c
+0>3:1c
+6>15:2c
+6>13:1r
+8>21:1c
 
 @why
 
 @flows
+CLI: 0>12
 MCP: 23>26
-CLI: 0>22>13
 MCP: 24>23>26
 
 @function_calls
-main>InitDB,Install,BuildMap,HandleConfig,Help,Uninstall,Version,HandleHooks,ServeMcp,InitializeProjectSession,Unknown,ShowWelcomeUI,printSessions,printObservations,printSummaries
-HandleHook>ShowWelcomeUI,Load,GetAllMemories,BuildFinalPrompt
+main>InitDB,Install,BuildMap,Help,Uninstall,Version,ServeMcp,Unknown,ShowWelcomeUI,printSessions,printObservations,printSummaries
 ParseInput>mapify
 BuildMap>LoadCache,ShouldSkipDir,Name,isSupported,GetFileHash,parseFile,SaveCache,scoreFile,isEntryPoint,findFile,extractKeyFunctions,isLowValueCall
 extractKeyFunctions>isHighSignalFunc
@@ -124,6 +119,7 @@ handleToolUse>shouldSaveObservation
 handleSessionEnd>CompleteSession
 Install>CreateSkills,upsertCodexMCPServer
 upsertCodexMCPServer>stripCogitoMCPBlock
+Uninstall>stripCogitoMCPBlock
 GetConfigPathForDir>GetConfigPath
 Load>LoadForDir
 LoadForDir>GetConfigPathForDir,defaultConfig,IsValid
@@ -132,7 +128,6 @@ CreateObservation>Append
 GetRecentObservations>Get,Set
 FastSearch>SearchObservationsFTS,Get
 StartPendingWorker>GetUnprocessedObservations,GetProjectBySession,CreateObservation,MarkObservationProcessed
-ShowWelcomeUI>Load
 handleRequest>newSessionID,InitializeProjectSession,errorResponse,trimInput,runCaveman,cleanOutput,BuildMap
-ServeMcp>handleRequest
+ServeMcp>CompleteSession,handleRequest
 runCaveman>callModel,validateOutput
