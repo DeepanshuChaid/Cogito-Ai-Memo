@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -152,37 +149,7 @@ func cleanOutput(s string) string {
 var debugLogMu sync.Mutex
 const debugLogPath = "C:\\Users\\HP\\Downloads\\CODING\\Cogito\\debug-2ed107.log"
 
-func writeDebugLog(runID, hypothesisID, location, message string, data map[string]interface{}) {
-	payload := map[string]interface{}{
-		"sessionId":    "2ed107",
-		"runId":        runID,
-		"hypothesisId": hypothesisID,
-		"location":     location,
-		"message":      message,
-		"data":         data,
-		"timestamp":    time.Now().UnixMilli(),
-	}
 
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return
-	}
-
-	debugLogMu.Lock()
-	defer debugLogMu.Unlock()
-
-	path := debugLogPath
-	if !filepath.IsAbs(path) {
-		path = "C:\\Users\\HP\\Downloads\\CODING\\Cogito\\debug-2ed107.log"
-	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-
-	_, _ = f.Write(append(raw, '\n'))
-}
 
 func newSessionID() string {
 	var b [8]byte
