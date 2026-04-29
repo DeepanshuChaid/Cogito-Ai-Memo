@@ -190,6 +190,7 @@ Only disable caveman mode if user explicitly says:
 	fmt.Println("ðŸ“ Codex will call: cogito serve-mcp")
 }
 
+
 func upsertCodexMCPServer(homeDir string) error {
 	codexDir := filepath.Join(homeDir, ".codex")
 	if err := os.MkdirAll(codexDir, 0755); err != nil {
@@ -203,9 +204,8 @@ func upsertCodexMCPServer(homeDir string) error {
 	content := stripCogitoMCPBlock(string(existing))
 	content = strings.TrimSpace(content)
 
-	// 2. Build the new block (using absolute path for reliability)
-	execPath, _ := os.Executable()
-	execPath, _ = filepath.EvalSymlinks(execPath)
+	// 2. Always point to stable Go bin location
+	execPath := filepath.Join(homeDir, "go", "bin", "cogito.exe")
 
 	newBlock := "\n\n[mcp_servers.cogito]\n" +
 		fmt.Sprintf("command = %q\n", execPath) +
@@ -220,26 +220,35 @@ func upsertCodexMCPServer(homeDir string) error {
 	return os.WriteFile(configPath, []byte(finalContent), 0644)
 }
 
-var OBSERVATION_PROMPT = `create_observation only for real engineering changes.
+var OBSERVATION_PROMPT = `## Observation Hook (MCP Tool: create_observation)
 
-ignore: formatting, typos, experiments, obvious edits.
+After completing ANY engineering task, you MUST:
+1. Silently evaluate: does this change meet the bar below?
+2. If yes → call create_observation MCP tool immediately. No announcement. No explanation.
+3. If no → do nothing. Do not mention it.
 
-trigger: bugfix, architecture/strategy change, key decision, debug insight, root cause, non-obvious detail, critical constraint.
+---
 
-style: caveman. short. direct. technical. no filler.
-memory max: 25 words.
-facts max: 10 words.
+CREATE only when ALL 3 are true:
+- real logic/architecture/bug change (not rename, format, flag, string, config)
+- a future session would make wrong assumptions without it
+- not obvious from reading the code
 
-memory:
-what changed + impact.
+NEVER create for:
+- renaming or moving anything
+- adding a CLI flag or config field
+- fixing typo, lint, formatting
+- updating a prompt, comment, or string
+- refactoring with no behavior change
 
-facts (optional):
-stable system/project/user facts only.
+---
 
-example:
-memory: "removed async worker, direct MCP flow, reduced overhead"
-facts: "canvas uses DOM + SVG not fabric.js"
+memory: max 15 words. format: "changed X → Y, impact Z"
+facts: max 5 words. omit if unsure.
 
-rule:
-if it matters later -> create
-if not -> skip`
+if unsure → skip
+if trivial → skip
+
+---
+
+`

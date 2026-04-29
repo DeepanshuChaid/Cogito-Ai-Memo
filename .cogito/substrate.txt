@@ -59,34 +59,33 @@
 26 e30
 
 @edges
-22>24:2c
-0>9:1c
-0>20:1c
-22>16:1c
-22>21:1c
 0>7:1c
-0>3:1c
-0>11:1c
+0>6:1c
+0>22:1c
+21>24:7c
 3>10:1c
+3>2:1c
 7>19:1c
 21>3:1c
+22>21:1c
 0>13:1c
-0>6:1c
+0>3:1c
 0>8:1c
 3>4:3c
-5>12:5r
 7>8:1c
-0>22:1c
-3>2:1c
-21>24:12c
+21>14:1c
+22>16:1c
+0>11:1c
+0>9:1c
+0>20:1c
+5>12:5r
 21>16:1c
-21>14:2c
 
 @why
 
 @flows
 MCP: 21>24
-MCP: 22>24
+MCP: 22>21>24
 CLI: 0>13
 
 @function_calls
@@ -113,8 +112,8 @@ Load>LoadForDir
 LoadForDir>GetConfigPathForDir,defaultConfig,IsValid
 InitDB>resolveDBPath
 IsDuplicateObservation>normalizeMeaningText,writeObservationDebugLog,GetRecentObservations,jaccardSimilarity
-handleRequest>writeDebugLog,newSessionID,InitializeProjectSession,errorResponse,shortHash,IsDuplicateObservation,CreateObservation,BuildMap
-ServeMcp>writeDebugLog,CompleteSession,handleRequest
+handleRequest>newSessionID,InitializeProjectSession,errorResponse,CreateObservation,BuildMap
+ServeMcp>CompleteSession,handleRequest
 runCaveman>callModel,validateOutput
 printSessions>trim
 printObservations>trim

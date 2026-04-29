@@ -11,7 +11,7 @@
     "internals\\commands\\handleConfig.go": "8b7995719e43b257eac6fe75d3b3912ad8665123a9dbe57821f7a92edcccd210",
     "internals\\commands\\handleHooks.go": "4ddadcc6bd352a6e065e3b4bf9b28e85ae41e86d854c769bb679861158c6dc45",
     "internals\\commands\\help.go": "952fadddf1419b0e04b0275916ce2f59e6b90bad3635c2397b32735ce9e62a8a",
-    "internals\\commands\\install.go": "d981a4afead66da7fe6beace0831ceda49e2f4559fbb02e293f7bf0fa3da460e",
+    "internals\\commands\\install.go": "c73e6e771e7ceb597c18a97738fb3786a99ca2ca9ee9b84969b1deaa35fbab25",
     "internals\\commands\\uninstall.go": "4e8663b6135c0cb10772e197202f6fd5890ac3c143fdccb17b1d85e9e7adcf56",
     "internals\\commands\\unkown.go": "181e0328cc253bb53d922dadae924efdc459cddab7d3e1be6264d7083732e80c",
     "internals\\commands\\utils.go": "f3393fee71dc44252e94fc788f53049f4c29f375966aaa44fd6de0abdac933b6",
@@ -29,10 +29,10 @@
     "internals\\models\\schemaModels\\schemaModels.go": "dc4486a9f3aab26908c67ca0c6607c828d1ac578063befc58f67c899fd9aef7e",
     "internals\\utils\\skills\\skills.go": "31c57aba71fb88ab2018cd5546740b12f26fdb40e7496aa42e4973f9b845537e",
     "internals\\utils\\welcomeUi\\welcomeUi.go": "f7ed141157390ea9ae0aa5ca69547c84a21ac909371dca57c4c7b91fa9034529",
-    "mcpServer\\handleRequest.go": "e817e022db7c8e25ed7f9c526c2e86523a2df7129cf45e182c8c0d63f196d604",
-    "mcpServer\\mcpServer.go": "0b16d5dedbca3c4cad28d61955c0eef9973cc1f67f0c53c844f2caddf07b7ae8",
+    "mcpServer\\handleRequest.go": "8b9893d7866419ab375018a98b5d389dacbb8d6838df336e78b471194fc78c76",
+    "mcpServer\\mcpServer.go": "99d86db8d26498ba3fb14519e43d64fad04699a2b8496705f5d2b593f4bf74c4",
     "mcpServer\\types.go": "9e112bc36d6a4e04d71c29e1689f6fd07fbcf24c63130dbd0ef87bcdf2291e42",
-    "mcpServer\\utils.go": "fc9fc40d40543efcc331b37358f1d8edcdbdf6b26404afda3f6185a2f47ce9b4",
+    "mcpServer\\utils.go": "be680e18649b154044ef6eaa6bea0cbfe1d15d433e5113cbf4f8f071764c1fa8",
     "pkg\\types\\types.go": "06e21117debe985a3b206bad122f3ce0024faa96ee99d23a141fee353dbef676",
     "test.go": "1e8e3110833353654143f4abbc40848dea8e3fc3e536ede3074564f0b9ae6147"
   }
