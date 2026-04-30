@@ -157,13 +157,7 @@ func GenerateAutoSummary(sessionID string, project string) error {
 
 	// Always persist a session summary, even when no observations were captured.
 	if len(obs) == 0 {
-		return db.CreateSessionSummary(
-			sessionID,
-			project,
-			"Auto-Generated via Shutdown Hook",
-			"No observations captured in this session.",
-			"Add at least one create_observation call next session.",
-		)
+		return nil
 	}
 
 	var obsText bytes.Buffer

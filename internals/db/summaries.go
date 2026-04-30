@@ -52,3 +52,87 @@ func GetLatestSessionSummary(project string) (*schemaModels.SessionSummary, erro
 	summary.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
 	return summary, nil
 }
+
+// GetRecentSessionSummaries fetches latest summaries for prompt/context use
+func GetRecentSessionSummaries(project string, limit int) ([]schemaModels.SessionSummary, error) {
+	rows, err := DB.Query(`
+		SELECT id, session_id, project, request, learned, next_steps, created_at
+		FROM session_summaries
+		WHERE project = ?
+		ORDER BY created_at DESC
+		LIMIT ?
+	`, project, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var summaries []schemaModels.SessionSummary
+	for rows.Next() {
+		var s schemaModels.SessionSummary
+		var createdAt string
+
+		if err := rows.Scan(
+			&s.ID,
+			&s.SessionID,
+			&s.Project,
+			&s.Request,
+			&s.Learned,
+			&s.NextSteps,
+			&createdAt,
+		); err != nil {
+			continue
+		}
+
+		s.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+		summaries = append(summaries, s)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return summaries, nil
+}
+
+// GetRecentSessionSummariesExcludingSession fetches latest summaries excluding one session
+func GetRecentSessionSummariesExcludingSession(project, excludeSessionID string, limit int) ([]schemaModels.SessionSummary, error) {
+	rows, err := DB.Query(`
+		SELECT id, session_id, project, request, learned, next_steps, created_at
+		FROM session_summaries
+		WHERE project = ?
+			AND session_id != ?
+		ORDER BY created_at DESC
+		LIMIT ?
+	`, project, excludeSessionID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var summaries []schemaModels.SessionSummary
+	for rows.Next() {
+		var s schemaModels.SessionSummary
+		var createdAt string
+
+		if err := rows.Scan(
+			&s.ID,
+			&s.SessionID,
+			&s.Project,
+			&s.Request,
+			&s.Learned,
+			&s.NextSteps,
+			&createdAt,
+		); err != nil {
+			continue
+		}
+
+		s.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+		summaries = append(summaries, s)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return summaries, nil
+}

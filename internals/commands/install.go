@@ -33,6 +33,11 @@ ALWAYS use get_codebase_map when asked about codebase. Use before answering abou
 
 Do not guess codebase context without it. Use tool first. Then respond.
 
+At session start, before first user-facing answer:
+- call get_project_memory
+- use returned past-session observations/summaries as project memory context
+- if tool fails, continue without blocking
+
 ALWAYS use caveman mode immediately.
 
 Do not announce loading skills.

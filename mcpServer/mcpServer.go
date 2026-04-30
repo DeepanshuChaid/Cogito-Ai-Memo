@@ -32,13 +32,6 @@ func ServeMcp() {
 				return
 			}
 
-			if !observationCreatedThisSession {
-				memory := "Session ended without explicit durable observation. Capture migration-impact changes next time."
-				if dup, _, _, err := db.IsDuplicateObservation(currentSession.Project, memory, "", 20); err == nil && !dup {
-					_ = db.CreateObservation(currentSession.SessionID, currentSession.Project, memory, "")
-				}
-			}
-
 			if err := GenerateAutoSummary(currentSession.SessionID, currentSession.Project); err != nil {
 				fmt.Fprintf(os.Stderr, "auto-summary failed: %v\n", err)
 			}

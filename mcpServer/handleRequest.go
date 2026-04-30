@@ -1,6 +1,7 @@
 package mcpServer
 
 import (
+	"encoding/json"
 	"os"
 	// "path/filepath"
 	// "strings"
@@ -13,6 +14,14 @@ import (
 
 var currentSession *schemaModels.Session
 var observationCreatedThisSession bool
+
+func toJSONString(v interface{}) string {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return "{}"
+	}
+	return string(raw)
+}
 
 func handleRequest(req JSONRPCRequest) interface{} {
 
@@ -102,6 +111,32 @@ func handleRequest(req JSONRPCRequest) interface{} {
 						"required": []string{"request", "learned", "nextSteps"},
 					},
 				},
+				{
+					"name":        "get_recent_context",
+					"description": "Fetch recent observations and summaries for this project.",
+					"inputSchema": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"limit": map[string]interface{}{
+								"type":        "number",
+								"description": "Max items per list (default 10).",
+							},
+						},
+					},
+				},
+				{
+					"name":        "get_project_memory",
+					"description": "Fetch past-session memory (observations and summaries) for this project.",
+					"inputSchema": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"limit": map[string]interface{}{
+								"type":        "number",
+								"description": "Max items per list (default 8).",
+							},
+						},
+					},
+				},
 			},
 		}
 
@@ -124,7 +159,15 @@ func handleRequest(req JSONRPCRequest) interface{} {
 
 			lore := ""
 			if currentSession != nil {
-				// future: fetch observations
+				observations, errObs := db.GetRecentObservationsExcludingSession(currentSession.Project, currentSession.SessionID, 6)
+				summaries, errSum := db.GetRecentSessionSummariesExcludingSession(currentSession.Project, currentSession.SessionID, 3)
+				if errObs == nil && errSum == nil {
+					payload := map[string]interface{}{
+						"observations": observations,
+						"summaries":    summaries,
+					}
+					lore = "PROJECT MEMORY (PAST SESSIONS):\n" + toJSONString(payload)
+				}
 			}
 
 			return map[string]interface{}{
@@ -210,13 +253,85 @@ func handleRequest(req JSONRPCRequest) interface{} {
 			if currentSession == nil {
 				return errorResponse(-32602, "no active session")
 			}
-			err := db.CreateSessionSummary(currentSession.SessionID, cwd, request, learned, nextSteps)
+			sessionObs, err := db.GetSessionObservations(currentSession.SessionID)
+			if err != nil {
+				return errorResponse(-32603, err.Error())
+			}
+			if len(sessionObs) == 0 {
+				return errorResponse(-32602, "cannot create summary: no observations created in this session")
+			}
+			err = db.CreateSessionSummary(currentSession.SessionID, cwd, request, learned, nextSteps)
 			if err != nil {
 				return errorResponse(-32603, err.Error())
 			}
 			return map[string]interface{}{
 				"content": []map[string]interface{}{
 					{"type": "text", "text": "Session Summary Saved Successfully!"},
+				},
+			}
+		}
+
+		if name == "get_recent_context" {
+			limit := 10
+			if arg, ok := req.Params["arguments"].(map[string]interface{}); ok {
+				if rawLimit, ok := arg["limit"].(float64); ok && int(rawLimit) > 0 {
+					limit = int(rawLimit)
+				}
+			}
+
+			cwd, _ := os.Getwd()
+			observations, err := db.GetRecentObservations(cwd, limit)
+			if err != nil {
+				return errorResponse(-32603, err.Error())
+			}
+
+			summaries, err := db.GetRecentSessionSummaries(cwd, limit)
+			if err != nil {
+				return errorResponse(-32603, err.Error())
+			}
+
+			payload := map[string]interface{}{
+				"observations": observations,
+				"summaries":    summaries,
+			}
+
+			return map[string]interface{}{
+				"content": []map[string]interface{}{
+					{"type": "text", "text": toJSONString(payload)},
+				},
+			}
+		}
+
+		if name == "get_project_memory" {
+			if currentSession == nil {
+				return errorResponse(-32602, "no active session")
+			}
+
+			limit := 8
+			if arg, ok := req.Params["arguments"].(map[string]interface{}); ok {
+				if rawLimit, ok := arg["limit"].(float64); ok && int(rawLimit) > 0 {
+					limit = int(rawLimit)
+				}
+			}
+
+			observations, err := db.GetRecentObservationsExcludingSession(currentSession.Project, currentSession.SessionID, limit)
+			if err != nil {
+				return errorResponse(-32603, err.Error())
+			}
+			summaries, err := db.GetRecentSessionSummariesExcludingSession(currentSession.Project, currentSession.SessionID, limit)
+			if err != nil {
+				return errorResponse(-32603, err.Error())
+			}
+
+			payload := map[string]interface{}{
+				"project":      currentSession.Project,
+				"observations": observations,
+				"summaries":    summaries,
+			}
+
+			return map[string]interface{}{
+				"content": []map[string]interface{}{
+					{"type": "text", "text": toJSONString(payload)},
 				},
 			}
 		}

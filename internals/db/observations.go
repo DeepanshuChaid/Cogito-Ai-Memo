@@ -259,6 +259,42 @@ func GetRecentObservations(project string, limit int) ([]schemaModels.Observatio
 	return observations, nil
 }
 
+// GetRecentObservationsExcludingSession fetches latest observations excluding one session
+func GetRecentObservationsExcludingSession(project, excludeSessionID string, limit int) ([]schemaModels.Observation, error) {
+	rows, err := DB.Query(`
+		SELECT
+			memory,
+			facts,
+			created_at
+		FROM observations
+		WHERE project = ?
+			AND session_id != ?
+		ORDER BY created_at DESC
+		LIMIT ?
+	`, project, excludeSessionID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var observations []schemaModels.Observation
+	for rows.Next() {
+		var o schemaModels.Observation
+		var createdAt string
+
+		if err := rows.Scan(&o.Memory, &o.Facts, &createdAt); err != nil {
+			continue
+		}
+		o.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
+		observations = append(observations, o)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return observations, nil
+}
+
 // GetSessionObservations fetches observations for a specific session
 func GetSessionObservations(sessionID string) ([]schemaModels.Observation, error) {
 	rows, err := DB.Query(`

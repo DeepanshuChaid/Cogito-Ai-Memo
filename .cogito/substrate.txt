@@ -59,41 +59,41 @@
 26 e30
 
 @edges
-0>9:1c
-0>20:1c
-3>4:3c
-22>14:2c
 24>17:3c
-0>3:1c
-0>6:1c
+0>7:1c
 0>14:1c
-3>2:1c
-21>14:1c
-22>24:1c
-22>16:1c
 0>17:1c
-7>8:1c
+3>4:3c
+3>2:1c
 21>16:1c
 22>21:1c
-24>14:1c
 0>13:1c
 0>8:1c
+0>22:1c
+0>20:1c
 3>10:1c
+21>24:10c
+21>17:1c
+22>16:1c
+0>6:1c
 5>12:5r
 7>19:1c
-21>24:10c
-21>3:1c
-21>17:1c
-0>7:1c
+7>8:1c
+21>14:1c
+22>14:2c
+22>24:1c
+0>3:1c
 0>11:1c
-0>22:1c
+0>9:1c
+21>3:1c
+24>14:1c
 
 @why
 
 @flows
 MCP: 21>24>17
 MCP: 22>14
-CLI: 0>7>8
+CLI: 0>7>19
 
 @function_calls
 main>InitDB,Install,BuildMap,Help,Uninstall,Version,ServeMcp,GetRecentObservations,CreateSessionSummary,Unknown,ShowWelcomeUI,resetDatabase,printSessions,printObservations,printSummaries

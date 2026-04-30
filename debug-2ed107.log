@@ -1,0 +1,2 @@
+{"data":{"currentTokens":12,"project":"C:\\Users\\HP\\Downloads\\CODING\\Cogito","recentLimit":20},"hypothesisId":"H4","location":"internals/db/observations.go:IsDuplicateObservation","message":"starting duplicate scan","runId":"run1","sessionId":"2ed107","timestamp":1777554795716}
+{"data":{"score":1},"hypothesisId":"H4","location":"internals/db/observations.go:IsDuplicateObservation","message":"exact normalized duplicate found","runId":"run1","sessionId":"2ed107","timestamp":1777554795731}
