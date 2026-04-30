@@ -1,12 +1,8 @@
 package db
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/models/schemaModels"
@@ -19,40 +15,8 @@ var duplicateStopwords = map[string]struct{}{
 	"this": {}, "that": {}, "it": {}, "into": {}, "we": {}, "you": {}, "i": {}, "our": {}, "their": {},
 }
 
-var obsDebugLogMu sync.Mutex
-const observationDebugLogPath = "C:\\Users\\HP\\Downloads\\CODING\\Cogito\\debug-2ed107.log"
 
-func writeObservationDebugLog(runID, hypothesisID, location, message string, data map[string]interface{}) {
-	payload := map[string]interface{}{
-		"sessionId":    "2ed107",
-		"runId":        runID,
-		"hypothesisId": hypothesisID,
-		"location":     location,
-		"message":      message,
-		"data":         data,
-		"timestamp":    time.Now().UnixMilli(),
-	}
 
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return
-	}
-
-	obsDebugLogMu.Lock()
-	defer obsDebugLogMu.Unlock()
-
-	path := observationDebugLogPath
-	if !filepath.IsAbs(path) {
-		path = "C:\\Users\\HP\\Downloads\\CODING\\Cogito\\debug-2ed107.log"
-	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-
-	_, _ = f.Write(append(raw, '\n'))
-}
 
 func normalizeMeaningText(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
@@ -109,18 +73,7 @@ func IsDuplicateObservation(project, memory, facts string, recentLimit int) (boo
 		return false, "", 0, nil
 	}
 
-	// #region agent log
-	writeObservationDebugLog(
-		"run1",
-		"H4",
-		"internals/db/observations.go:IsDuplicateObservation",
-		"starting duplicate scan",
-		map[string]interface{}{
-			"project":      project,
-			"recentLimit":  recentLimit,
-			"currentTokens": len(strings.Fields(current)),
-		},
-	)
+
 	// #endregion
 
 	recent, err := GetRecentObservations(project, recentLimit)
@@ -136,16 +89,7 @@ func IsDuplicateObservation(project, memory, facts string, recentLimit int) (boo
 			continue
 		}
 		if current == candidate {
-			// #region agent log
-			writeObservationDebugLog(
-				"run1",
-				"H4",
-				"internals/db/observations.go:IsDuplicateObservation",
-				"exact normalized duplicate found",
-				map[string]interface{}{
-					"score": 1,
-				},
-			)
+
 			// #endregion
 			return true, obs.Memory, 1, nil
 		}
@@ -156,31 +100,12 @@ func IsDuplicateObservation(project, memory, facts string, recentLimit int) (boo
 			bestCandidate = obs.Memory
 		}
 		if score >= 0.72 {
-			// #region agent log
-			writeObservationDebugLog(
-				"run1",
-				"H5",
-				"internals/db/observations.go:IsDuplicateObservation",
-				"near duplicate found",
-				map[string]interface{}{
-					"score": score,
-				},
-			)
+
 			// #endregion
 			return true, obs.Memory, score, nil
 		}
 	}
 
-	// #region agent log
-	writeObservationDebugLog(
-		"run1",
-		"H5",
-		"internals/db/observations.go:IsDuplicateObservation",
-		"no duplicate found",
-		map[string]interface{}{
-			"bestScore": bestScore,
-		},
-	)
 	// #endregion
 
 	return false, bestCandidate, bestScore, nil
