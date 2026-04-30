@@ -214,9 +214,6 @@ func CreateObservation(sessionID, project, memory, facts string) error {
 func GetRecentObservations(project string, limit int) ([]schemaModels.Observation, error) {
 	rows, err := DB.Query(`
 		SELECT
-			id,
-			session_id,
-			project,
 			memory,
 			facts,
 			created_at
@@ -238,9 +235,54 @@ func GetRecentObservations(project string, limit int) ([]schemaModels.Observatio
 		var createdAt string
 
 		err := rows.Scan(
-			&o.ID,
-			&o.SessionID,
-			&o.Project,
+			&o.Memory,
+			&o.Facts,
+			&createdAt,
+		)
+
+		if err != nil {
+			continue
+		}
+
+		o.CreatedAt, _ = time.Parse(
+			"2006-01-02 15:04:05",
+			createdAt,
+		)
+
+		observations = append(observations, o)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return observations, nil
+}
+
+// GetSessionObservations fetches observations for a specific session
+func GetSessionObservations(sessionID string) ([]schemaModels.Observation, error) {
+	rows, err := DB.Query(`
+		SELECT
+			memory,
+			facts,
+			created_at
+		FROM observations
+		WHERE session_id = ?
+		ORDER BY created_at ASC
+	`, sessionID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var observations []schemaModels.Observation
+
+	for rows.Next() {
+		var o schemaModels.Observation
+		var createdAt string
+
+		err := rows.Scan(
 			&o.Memory,
 			&o.Facts,
 			&createdAt,

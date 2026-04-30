@@ -21,7 +21,15 @@ func Install() {
 	// âœ… STRONG CONTROL: AGENTS.md (THIS is what actually enforces behavior)
 	rootAgentsPath := filepath.Join(cwd, "AGENTS.md")
 
-	agentsContent := OBSERVATION_PROMPT + `ALWAYS use get_codebase_map when asked about codebase. Use before answering about architecture, flow, dependencies, structure, implementation, debugging, refactors, or writing code inside project.
+	agentsContent := OBSERVATION_PROMPT + `### Trigger 3: Session End
+Before ending the session, you MUST:
+- call create_summary with:
+  - request: what the user wanted
+  - learned: key technical outcomes
+  - nextSteps: what to do next
+
+
+ALWAYS use get_codebase_map when asked about codebase. Use before answering about architecture, flow, dependencies, structure, implementation, debugging, refactors, or writing code inside project.
 
 Do not guess codebase context without it. Use tool first. Then respond.
 
@@ -33,9 +41,9 @@ Just respond directly.
 
 ## Use normal caveman style for general communication and explanations:
 ---
-name: caveman
-description: Default response style. Ultra-terse. Always active.
+name: caveman: Default response style. Ultra-terse. Always active.
 ---
+description
 
 # Caveman Mode
 Default behavior for all responses.

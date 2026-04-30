@@ -39,12 +39,12 @@ type Session struct {
 // OBSERVATIONS
 // =============================================================================
 type Observation struct {
-	ID        int       `json:"id"`
-	SessionID string    `json:"session_id"`
-	Project   string    `json:"project"`
-	Memory    string    `json:"memory"`
-	Facts     string    `json:"facts"` // JSON array string
-	CreatedAt time.Time `json:"created_at"`
+	ID        int       `json:"id,omitempty"`
+	SessionID string    `json:"session_id,omitempty"`
+	Project   string    `json:"project,omitempty"`
+	Memory    string    `json:"memory,omitempty"`
+	Facts     string    `json:"facts,omitempty"` // JSON array string
+	CreatedAt time.Time `json:"created_at,omitempty"`
 }
 
 type ObservationSearchResult struct {

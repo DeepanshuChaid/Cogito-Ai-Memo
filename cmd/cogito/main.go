@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -44,6 +45,31 @@ func main() {
 
 		case "serve-mcp":
 			mcpServer.ServeMcp()
+			return
+
+		case "createSum":
+			cwd, _ := os.Getwd()
+			observatons, err := db.GetRecentObservations(cwd, 10)
+			if err != nil {
+				fmt.Println("ERROR: ", err)
+			}
+			json.NewEncoder(os.Stdout).Encode(observatons)
+			return
+
+		// Replace case "createSum" (around line 50)
+		case "summarize":
+			if len(os.Args) < 5 {
+				fmt.Println("Usage: cogito summarize <request> <learned> <next_steps>")
+				return
+			}
+			cwd, _ := os.Getwd()
+			// Using a dummy session ID for manual CLI testing
+			err := db.CreateSessionSummary("CLI_TEST", cwd, os.Args[2], os.Args[3], os.Args[4])
+			if err != nil {
+				fmt.Println("Error:", err)
+			} else {
+				fmt.Println("✅ Summary created.")
+			}
 			return
 
 

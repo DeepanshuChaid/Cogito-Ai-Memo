@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/db"
 )
 
 func ServeMcp() {
-
 	scanner := bufio.NewScanner(os.Stdin)
 	buf := make([]byte, 0, 1024*1024)
 	scanner.Buffer(buf, 10*1024*1024)
@@ -23,64 +23,77 @@ func ServeMcp() {
 	inputChan := make(chan []byte)
 
 	signal.Notify(stopChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(stopChan)
 
-	// GOROUNTINE 1: LISTEN FOR STDIN (NON BLOCKING)
+	var shutdownOnce sync.Once
+	finalizeSession := func() {
+		shutdownOnce.Do(func() {
+			if currentSession == nil {
+				return
+			}
+
+			if !observationCreatedThisSession {
+				memory := "Session ended without explicit durable observation. Capture migration-impact changes next time."
+				if dup, _, _, err := db.IsDuplicateObservation(currentSession.Project, memory, "", 20); err == nil && !dup {
+					_ = db.CreateObservation(currentSession.SessionID, currentSession.Project, memory, "")
+				}
+			}
+
+			if err := GenerateAutoSummary(currentSession.SessionID, currentSession.Project); err != nil {
+				fmt.Fprintf(os.Stderr, "auto-summary failed: %v\n", err)
+			}
+
+			if err := db.CompleteSession(currentSession.SessionID); err != nil {
+				fmt.Fprintf(os.Stderr, "complete session failed: %v\n", err)
+			}
+		})
+	}
+	defer finalizeSession()
+
 	go func() {
 		for scanner.Scan() {
-			// WE ARE COPYING THE INPUT FROM THE SCANNER TO OUR INPUT CHANNEL
 			msg := make([]byte, len(scanner.Bytes()))
 			copy(msg, scanner.Bytes())
 			inputChan <- msg
 		}
-		// IF STDIN CLOSES (EOF) TRIGGER A CLEAN SHUTDOWN
 		stopChan <- syscall.SIGTERM
 	}()
 
-	// MAIN LOOP THE TRAFFIC CONTROLLER
 	for {
 		select {
-			case <- stopChan:
-				if currentSession != nil {
-					if !observationCreatedThisSession {
-						memory := "Session ended without explicit durable observation. Capture migration-impact changes next time."
-						if dup, _, _, err := db.IsDuplicateObservation(currentSession.Project, memory, "", 20); err == nil && !dup {
-							_ = db.CreateObservation(currentSession.SessionID, currentSession.Project, memory, "")
-						}
-					}
-					_ = db.CompleteSession(currentSession.SessionID)
-				}
-				return // EXITS THE FUNCTIONS & STOPS THE PROCESS CLEANLY
-			case rawBytes := <- inputChan:
-				var req JSONRPCRequest
-				err := json.Unmarshal(rawBytes, &req)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "JSON decode error: %v\n", err)
-					continue
-				}
+		case <-stopChan:
+			finalizeSession()
+			return
+		case rawBytes := <-inputChan:
+			var req JSONRPCRequest
+			err := json.Unmarshal(rawBytes, &req)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "JSON decode error: %v\n", err)
+				continue
+			}
 
-				if req.ID == nil {
-					continue
-				}
+			if req.ID == nil {
+				continue
+			}
 
-				result := handleRequest(req)
+			result := handleRequest(req)
 
-				resp := JSONRPCResponse{
-					JSONRPC: "2.0",
-					ID: req.ID,
-				}
+			resp := JSONRPCResponse{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+			}
 
-				if m, ok := result.(map[string]interface{}); ok {
-					if errVal, exists := m["error"]; exists {
-						resp.Error = errVal
-					} else {
-						resp.Result = m
-					}
+			if m, ok := result.(map[string]interface{}); ok {
+				if errVal, exists := m["error"]; exists {
+					resp.Error = errVal
 				} else {
-					resp.Result = result
+					resp.Result = m
 				}
+			} else {
+				resp.Result = result
+			}
 
-				encoder.Encode(resp)
+			encoder.Encode(resp)
 		}
-
 	}
 }

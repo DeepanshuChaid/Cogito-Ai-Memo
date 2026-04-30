@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/db"
 )
 
 // 🔥 KEEP IT SHORT (important)
@@ -34,7 +36,6 @@ func errorResponse(code int, msg string) map[string]interface{} {
 		},
 	}
 }
-
 
 func validateOutput(text string) error {
 	trimmed := strings.TrimSpace(text)
@@ -71,7 +72,6 @@ func trimInput(s string) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
 
 func runCaveman(prompt string) (string, error) {
 	var output string
@@ -112,7 +112,6 @@ Return corrected lines only.
 	return output, fmt.Errorf("failed to enforce caveman constraints")
 }
 
-
 func callModel(prompt string) (string, error) {
 	cmd := exec.Command("codex", "exec", "-")
 
@@ -141,11 +140,74 @@ func callModel(prompt string) (string, error) {
 	return result, nil
 }
 
-
 func newSessionID() string {
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return fmt.Sprintf("session-%d", time.Now().UnixNano())
 	}
 	return fmt.Sprintf("session-%d-%s", time.Now().UnixNano(), hex.EncodeToString(b[:]))
+}
+
+func GenerateAutoSummary(sessionID string, project string) error {
+	// 1. Fetch observations from this session
+	obs, err := db.GetSessionObservations(sessionID)
+	if err != nil {
+		return err
+	}
+
+	// Always persist a session summary, even when no observations were captured.
+	if len(obs) == 0 {
+		return db.CreateSessionSummary(
+			sessionID,
+			project,
+			"Auto-Generated via Shutdown Hook",
+			"No observations captured in this session.",
+			"Add at least one create_observation call next session.",
+		)
+	}
+
+	var obsText bytes.Buffer
+	for i, o := range obs {
+		obsText.WriteString(fmt.Sprintf("%d. %s (Facts: %s)\n", i+1, o.Memory, o.Facts))
+	}
+
+	prompt := fmt.Sprintf(`
+You are a senior engineer summarizing a coding session.
+Write a dense, technical handover summary for the next session.
+
+OBSERVATIONS FROM THIS SESSION:
+%s
+
+FORMAT RULES:
+- Be extremely concise. Caveman style allowed if clear.
+- Output ONLY the summary text, no pleasantries, no markdown blocks.
+
+SUMMARY:
+`, obsText.String())
+
+	// 2. Call the model (runs codex exec -)
+	summary, err := callModel(prompt)
+	if err != nil {
+		// During Ctrl+C shutdown, model subprocess may fail.
+		// Persist a deterministic fallback summary so next session has context.
+		var fallback bytes.Buffer
+		fallback.WriteString("Model summary unavailable during shutdown. Key observations:\n")
+		max := len(obs)
+		if max > 5 {
+			max = 5
+		}
+		for i := 0; i < max; i++ {
+			fallback.WriteString(fmt.Sprintf("%d. %s\n", i+1, strings.TrimSpace(obs[i].Memory)))
+		}
+		return db.CreateSessionSummary(
+			sessionID,
+			project,
+			"Auto-Generated via Shutdown Hook",
+			strings.TrimSpace(fallback.String()),
+			"Review observations and continue from listed changes.",
+		)
+	}
+
+	// 3. Save to DB
+	return db.CreateSessionSummary(sessionID, project, "Auto-Generated via Shutdown Hook", summary, "Check observations for details.")
 }

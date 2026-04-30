@@ -133,3 +133,54 @@ Use this for compression tasks:
 Only disable caveman mode if user explicitly says:
 "stop caveman"
 "normal mode"
+
+## Observation Hook (MCP Tool: create_observation)
+
+MANDATORY:
+- If user states completed real engineering change, call create_observation before reply.
+- Never wait for reminder. Never skip for major migrations.
+- If call fails, retry once with shorter memory.
+
+When user reports a past change ("I did X", "I changed Y", "I fixed Z"):
+- DO NOT give advice.
+- DO NOT give checklists.
+- DO NOT explain risks or next steps.
+- Evaluate silently ? call create_observation if it qualifies ? respond with nothing or "ok." only.
+
+Two triggers. Both silent. No announcement.
+
+---
+
+### Trigger 1: Engineering Change
+After completing or learning about a task that changes logic/architecture/behavior:
+- call create_observation if ALL true:
+  - real behavior/logic change (not rename, format, flag, string, config)
+  - future session would make wrong assumption without it
+  - not obvious from reading the code
+- memory field: max 15 words. format: "changed X ? Y, impact Z"
+
+NEVER create for: rename, flag/field add, typo fix, comment/prompt update, no-behavior refactor.
+
+---
+
+### Trigger 2: New Stable Fact Discovered
+If user reveals something stable and non-obvious about the project or themselves:
+- architectural preference, hard constraint, tech choice, dev habit
+- facts field only: max 5 words.
+- memory field: omit or 1 sentence max.
+
+NEVER create for: obvious things, one-off preferences, things that might change.
+
+---
+
+if unsure ? skip
+if trivial ? skip
+if already in facts ? skip
+
+### Trigger 3: Session End
+Before ending the session, you MUST:
+- call create_summary with:
+  - request: what the user wanted
+  - learned: key technical outcomes
+  - nextSteps: what to do next
+

@@ -11,10 +11,8 @@ import (
 	"github.com/DeepanshuChaid/Cogito-Ai.git/internals/models/schemaModels"
 )
 
-
 var currentSession *schemaModels.Session
 var observationCreatedThisSession bool
-
 
 func handleRequest(req JSONRPCRequest) interface{} {
 
@@ -37,7 +35,6 @@ func handleRequest(req JSONRPCRequest) interface{} {
 		// }()
 
 		// go commands.BuildMap()
-
 
 		return map[string]interface{}{
 			"protocolVersion": "2025-06-18",
@@ -64,18 +61,18 @@ func handleRequest(req JSONRPCRequest) interface{} {
 		return map[string]interface{}{
 			"tools": []map[string]interface{}{
 				{
-					"name": "create_observation",
+					"name":        "create_observation",
 					"description": "Store one durable engineering memory from an important activity, decision, discovery, or bugfix",
 
 					"inputSchema": map[string]interface{}{
 						"type": "object",
 						"properties": map[string]interface{}{
 							"memory": map[string]interface{}{
-								"type": "string",
+								"type":        "string",
 								"description": "Compressed durable summary of what happened and why it matters",
 							},
 							"facts": map[string]interface{}{
-								"type": "string",
+								"type":        "string",
 								"description": "JSON array of pure factual points for retrieval",
 							},
 						},
@@ -90,6 +87,19 @@ func handleRequest(req JSONRPCRequest) interface{} {
 					"inputSchema": map[string]interface{}{
 						"type":       "object",
 						"properties": map[string]interface{}{},
+					},
+				},
+				{
+					"name":        "create_summary",
+					"description": "Store a high-level summary of the session: what the user asked, what was learned, and next steps.",
+					"inputSchema": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"request":   map[string]interface{}{"type": "string", "description": "The user's original request"},
+							"learned":   map[string]interface{}{"type": "string", "description": "Key things learned/changed"},
+							"nextSteps": map[string]interface{}{"type": "string", "description": "Recommended next steps"},
+						},
+						"required": []string{"request", "learned", "nextSteps"},
 					},
 				},
 			},
@@ -183,6 +193,30 @@ func handleRequest(req JSONRPCRequest) interface{} {
 			return map[string]interface{}{
 				"content": []map[string]interface{}{
 					{"type": "text", "text": output},
+				},
+			}
+		}
+
+		// Add this to the tools/call switch (around line 188)
+		if name == "create_summary" {
+			arg, _ := req.Params["arguments"].(map[string]interface{})
+			request, _ := arg["request"].(string)
+			learned, _ := arg["learned"].(string)
+			nextSteps, _ := arg["nextSteps"].(string)
+			if request == "" || learned == "" || nextSteps == "" {
+				return errorResponse(-32602, "request, learned, nextSteps are required")
+			}
+			cwd, _ := os.Getwd()
+			if currentSession == nil {
+				return errorResponse(-32602, "no active session")
+			}
+			err := db.CreateSessionSummary(currentSession.SessionID, cwd, request, learned, nextSteps)
+			if err != nil {
+				return errorResponse(-32603, err.Error())
+			}
+			return map[string]interface{}{
+				"content": []map[string]interface{}{
+					{"type": "text", "text": "Session Summary Saved Successfully!"},
 				},
 			}
 		}

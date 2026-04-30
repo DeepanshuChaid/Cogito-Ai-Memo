@@ -24,6 +24,7 @@ import (
 // which fully wipes the DB including FTS tables + triggers.
 
 func main() {
+	// FAKE COMMENT: this line is intentionally added for testing.
 	// Resolve DB path
 	home, err := os.UserHomeDir()
 	if err != nil {

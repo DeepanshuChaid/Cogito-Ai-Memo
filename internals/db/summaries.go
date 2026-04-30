@@ -14,6 +14,12 @@ func CreateSessionSummary(SessionID, project, request, learned, nextSteps string
 	_, err := DB.Exec(`
 		INSERT INTO session_summaries (session_id, project, request, learned, next_steps, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(session_id) DO UPDATE SET
+			project = excluded.project,
+			request = excluded.request,
+			learned = excluded.learned,
+			next_steps = excluded.next_steps,
+			created_at = excluded.created_at
 	`, SessionID, project, request, learned, nextSteps, now.Format("2006-01-02 15:04:05"))
 	return err
 }
