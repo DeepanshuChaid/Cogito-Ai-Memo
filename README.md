@@ -1,25 +1,20 @@
-# Cogito
+# Cogito 🧠
 
-Project memory MCP server for coding agents While maintaining token efficiency or TYPE SHIT IDK TBH.
+Cogito is a project-memory MCP server for coding agents.
+It stores durable engineering context per project and reuses it in future sessions.
 
-Cogito stores durable engineering observations and session summaries per project, then serves that memory back in later sessions and uses two extra skills and a tool at the side such as a caveman talking to reduce yapping of the AI agent and Get Map creating a simple map of the Codebase Cuz yk Map & shit ? Do i need to explain why?.
+## ✨ What It Does
 
-## What it does
-
-- Creates map yeah thats it tbh
-- talk in Direct cold, Precise manner saving token or maybe not idk.(Not gonna claim false stuff)
-- Creates project-scoped sessions.
-- Stores durable observations (`create_observation`).
-- Stores session summaries (`create_summary`) with guard:
-  - summary is blocked if no observation exists in that session.
-- Fetches context:
+- Creates project-scoped memory sessions.
+- Stores durable observations with `create_observation`.
+- Stores session summaries with `create_summary`.
+- Retrieves memory with:
   - `get_project_memory` (past sessions, same project)
   - `get_recent_context` (latest observations + summaries)
-- Builds codebase substrate map:
-  - `get_codebase_map`
-- Auto-injects past-session memory into `caveman-review` prompt.
+- Builds a codebase substrate map with `get_codebase_map`.
+- Supports stricter/terser agent workflows (for example caveman-style policies).
 
-## Install
+## 📦 Install
 
 ```bash
 git clone https://github.com/DeepanshuChaid/Cogito-Ai.git
@@ -27,7 +22,7 @@ cd Cogito-Ai
 go install ./cmd/cogito
 ```
 
-## Quick start
+## 🚀 Quick Start
 
 ```bash
 cogito install
@@ -35,11 +30,11 @@ cogito install
 
 `cogito install` writes:
 
-- root `AGENTS.md` policy block
-- skills under project
+- Root `AGENTS.md` policy block
+- Skills inside the project
 - MCP server registration in `~/.codex/config.toml`
 
-## MCP tools
+## 🛠️ MCP Tools
 
 - `create_observation`
   - Input:
@@ -49,22 +44,22 @@ cogito install
   - Input:
     - `request`, `learned`, `nextSteps`
   - Guard:
-    - fails if current session has zero observations.
+    - Fails if current session has zero observations
 - `get_project_memory`
   - Input:
     - `limit` (optional, default `8`)
   - Returns:
-    - past-session observations + summaries for current project.
+    - Past-session observations + summaries for current project
 - `get_recent_context`
   - Input:
     - `limit` (optional, default `10`)
   - Returns:
-    - latest observations + summaries for current project.
+    - Latest observations + summaries for current project
 - `get_codebase_map`
   - Returns:
-    - `.cogito/substrate.txt` map.
+    - `.cogito/substrate.txt` map
 
-## Memory model
+## 🗃️ Memory Model
 
 - DB path: `~/.cogito/cogito.db`
 - Core tables:
@@ -73,7 +68,7 @@ cogito install
   - `session_summaries`
   - `observations_fts` (FTS5)
 
-## CLI commands
+## 💻 CLI Commands
 
 - `cogito install`
 - `cogito uninstall`
@@ -82,7 +77,7 @@ cogito install
 - `cogito --help`
 - `cogito -v`
 
-## Notes
+## 📝 Notes
 
 - Session auto-summary is skipped when no observations were created.
 - `get_project_memory` excludes the current active session by design.
